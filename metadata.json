@@ -1,0 +1,6 @@
+{
+  "name": "SI MANTAP LMS - Sistem Informasi Manajemen Absensi & Nilai Pembelajaran Terpadu SMP",
+  "description": "Sistem Informasi Manajemen Absensi & Nilai Pembelajaran Terintegrasi Antar Pelajar untuk jenjang SMP dengan RBAC, jadwal, absensi, leger nilai, poin pelanggaran, pembinaan BK, dan dashboard eksekutif.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
