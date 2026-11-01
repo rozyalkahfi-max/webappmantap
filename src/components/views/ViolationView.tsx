@@ -1,49 +1,73 @@
-import React, { useState } from 'react';
-import { AlertTriangle, Plus, Trash2, ShieldAlert, HeartHandshake, X, Filter } from 'lucide-react';
+import React, { useState, useMemo } from 'react';
+import { AlertTriangle, Plus, Trash2, ShieldAlert, HeartHandshake, X, Filter, BookOpen, CheckCircle2, Lock } from 'lucide-react';
 import { useSchool } from '../../context/SchoolContext';
 import { useAuth } from '../../context/AuthContext';
 import { ViolationRecord } from '../../types';
 import { DataTable, ColumnDef } from '../common/DataTable';
 
 export const ViolationView: React.FC = () => {
-  const { students, classes, violations, addViolation, deleteViolation, getStudentPoints, getStudentViolationCategory } = useSchool();
-  const { currentUser } = useAuth();
+  const {
+    students,
+    classes,
+    violations,
+    violationRules,
+    addViolation,
+    deleteViolation,
+    getStudentPoints,
+    getStudentViolationCategory,
+  } = useSchool();
+  const { currentUser, activeRole } = useAuth();
 
   const [selectedClass, setSelectedClass] = useState<string>('ALL');
+  const [selectedCategoryFilter, setSelectedCategoryFilter] = useState<string>('ALL');
   const [isModalOpen, setIsModalOpen] = useState(false);
 
+  // RBAC Permission check per requirement 3:
+  // "yang berhak melihat masukan tiap point yang diberikan guru mapel, dan wali kelas, hanya wali kelas dan guru BK yang bisa melihat"
+  // - Guru BK: see all records
+  // - Wali Kelas: see records for their class
+  // - Admin: see all
+  // - Guru Mapel: see reports they created
+  // - Kepala Sekolah: see severe cases (> 30 points) only
+  const isBkOrAdmin = activeRole === 'guru_bk' || activeRole === 'admin_operator';
+  const isWaliKelas = activeRole === 'wali_kelas';
+  const isGuruMapel = activeRole === 'guru_mapel';
+  const isKepsek = activeRole === 'kepala_sekolah';
+
+  // Modal form state
+  const defaultRule = violationRules[0] || {
+    id: 'default',
+    code: 'PLG01',
+    category: 'Ringan' as const,
+    name: 'Terlambat masuk sekolah > 15 menit',
+    points: 5,
+    description: 'Tiba setelah bel dibunyikan',
+  };
+
+  const [selectedRuleCode, setSelectedRuleCode] = useState<string>(defaultRule.code);
   const [formData, setFormData] = useState({
     studentId: '',
-    date: '2026-10-31',
-    category: 'Kedisiplinan' as 'Kedisiplinan' | 'Ketertiban' | 'Kerapian' | 'Sikap & Etika' | 'Berat',
-    violationType: 'Terlambat masuk sekolah > 15 menit',
-    description: '',
-    points: 5,
+    date: new Date().toISOString().slice(0, 10),
+    category: defaultRule.category as 'Ringan' | 'Sedang' | 'Berat',
+    violationType: defaultRule.name,
+    description: defaultRule.description,
+    points: defaultRule.points,
     reporterCode: currentUser?.teacherCode || 'G01',
     reporterName: currentUser?.name || 'Guru Pelapor',
     notes: '',
   });
 
-  const violationPresets: Record<string, { points: number; desc: string }> = {
-    'Terlambat masuk sekolah > 15 menit': { points: 5, desc: 'Tiba di gerbang sekolah setelah bel masuk dibunyikan.' },
-    'Seragam tidak sesuai ketentuan atribut': { points: 5, desc: 'Tidak mengenakan atribut lengkap seperti dasi, sabuk, atau kaos kaki putih.' },
-    'Rambut panjang / tidak rapi (siswa putra)': { points: 8, desc: 'Panjang rambut melebihi kerah kemeja seragam sekolah.' },
-    'Meninggalkan kelas saat jam pelajaran (Bolos Mapel)': { points: 15, desc: 'Keluar kelas tanpa izin guru pengampu saat KBM berlangsung.' },
-    'Membawa gawai tanpa izin saat ujian': { points: 15, desc: 'Menggunakan smartphone di dalam ruang asesmen.' },
-    'Merusak fasilitas / sarana prasarana sekolah': { points: 20, desc: 'Melakukan vandalisme atau mencoret meja/kursi/dinding sekolah.' },
-    'Terlibat perkelahian / pertengkaran fisik': { points: 25, desc: 'Terlibat kontak fisik yang mengganggu ketertiban umum sekolah.' },
-    'Melakukan tindakan perundungan (Bullying)': { points: 35, desc: 'Tindakan intimidasi fisik atau psikis berulang terhadap peserta didik lain.' },
-  };
-
   const handleOpenAdd = () => {
     const firstStudent = students[0];
+    const rule = violationRules.find((r) => r.code === selectedRuleCode) || defaultRule;
+
     setFormData({
       studentId: firstStudent ? firstStudent.id : '',
       date: new Date().toISOString().slice(0, 10),
-      category: 'Kedisiplinan',
-      violationType: 'Terlambat masuk sekolah > 15 menit',
-      description: violationPresets['Terlambat masuk sekolah > 15 menit'].desc,
-      points: 5,
+      category: rule.category,
+      violationType: rule.name,
+      description: rule.description,
+      points: rule.points,
       reporterCode: currentUser?.teacherCode || 'G01',
       reporterName: currentUser?.name || 'Guru Pelapor',
       notes: '',
@@ -51,14 +75,18 @@ export const ViolationView: React.FC = () => {
     setIsModalOpen(true);
   };
 
-  const handlePresetChange = (type: string) => {
-    const preset = violationPresets[type];
-    setFormData({
-      ...formData,
-      violationType: type,
-      points: preset ? preset.points : formData.points,
-      description: preset ? preset.desc : formData.description,
-    });
+  const handleRuleChange = (code: string) => {
+    setSelectedRuleCode(code);
+    const rule = violationRules.find((r) => r.code === code);
+    if (rule) {
+      setFormData((prev) => ({
+        ...prev,
+        category: rule.category,
+        violationType: rule.name,
+        points: rule.points,
+        description: rule.description,
+      }));
+    }
   };
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -86,10 +114,35 @@ export const ViolationView: React.FC = () => {
     setIsModalOpen(false);
   };
 
-  const filteredViolations = violations.filter((v) => {
-    if (selectedClass !== 'ALL' && v.classId !== selectedClass) return false;
-    return true;
-  });
+  // Filter violations according to role permissions and filters
+  const filteredViolations = useMemo(() => {
+    return violations.filter((v) => {
+      // 1. Role Scoping
+      if (isWaliKelas) {
+        // Walas only sees students of their assigned class
+        if (currentUser?.classId && v.classId !== currentUser.classId) return false;
+      } else if (isGuruMapel) {
+        // Guru mapel sees their reported violations
+        const code = currentUser?.teacherCode;
+        const name = currentUser?.name?.toLowerCase();
+        const matchCode = code && v.reporterCode === code;
+        const matchName = name && v.reporterName?.toLowerCase().includes(name);
+        if (!matchCode && !matchName) return false;
+      } else if (isKepsek) {
+        // Kepsek only sees severe violations (> 30 total student points) per requirement 3
+        const total = getStudentPoints(v.studentId);
+        if (total <= 30) return false;
+      }
+
+      // 2. Class filter
+      if (selectedClass !== 'ALL' && v.classId !== selectedClass) return false;
+
+      // 3. Category filter (Ringan, Sedang, Berat)
+      if (selectedCategoryFilter !== 'ALL' && v.category !== selectedCategoryFilter) return false;
+
+      return true;
+    });
+  }, [violations, isWaliKelas, isGuruMapel, isKepsek, currentUser, selectedClass, selectedCategoryFilter, getStudentPoints]);
 
   const columns: ColumnDef<ViolationRecord>[] = [
     {
@@ -101,62 +154,67 @@ export const ViolationView: React.FC = () => {
     },
     {
       key: 'studentName',
-      header: 'Nama Siswa',
+      header: 'Identitas Siswa',
       sortable: true,
+      render: (v) => (
+        <div>
+          <span className="font-semibold text-slate-900 block">{v.studentName}</span>
+          <span className="text-[11px] font-mono text-slate-500">Kelas {v.classId}</span>
+        </div>
+      ),
+    },
+    {
+      key: 'category',
+      header: 'Kategori',
+      sortable: true,
+      align: 'center',
+      width: '110px',
       render: (v) => {
-        const total = getStudentPoints(v.studentId);
-        const cat = getStudentViolationCategory(total);
+        let badgeColor = 'bg-blue-50 text-blue-800 border-blue-200';
+        if (v.category === 'Berat') badgeColor = 'bg-rose-50 text-rose-800 border-rose-200 font-bold';
+        else if (v.category === 'Sedang') badgeColor = 'bg-amber-50 text-amber-800 border-amber-200 font-semibold';
+        else badgeColor = 'bg-slate-50 text-slate-700 border-slate-200';
+
         return (
-          <div>
-            <span className="font-semibold text-slate-900 block">{v.studentName}</span>
-            <span className="text-[10px] text-slate-400 font-mono">
-              Total: <strong className="text-slate-800">{total} Poin</strong> ({cat.badge})
-            </span>
-          </div>
+          <span className={`text-[10px] px-2 py-0.5 rounded border ${badgeColor}`}>
+            {v.category}
+          </span>
         );
       },
     },
     {
-      key: 'classId',
-      header: 'Kelas',
-      sortable: true,
-      align: 'center',
-      width: '80px',
-      render: (v) => (
-        <span className="font-bold text-blue-700 bg-blue-50 px-2 py-0.5 rounded border border-blue-200">
-          {v.classId}
-        </span>
-      ),
-    },
-    {
       key: 'violationType',
-      header: 'Jenis Pelanggaran',
+      header: 'Bentuk Pelanggaran',
       sortable: true,
       render: (v) => (
         <div>
-          <span className="font-semibold text-slate-900 block">{v.violationType}</span>
-          <span className="text-[11px] text-slate-500 line-clamp-1">{v.description}</span>
+          <span className="font-semibold text-slate-800 block">{v.violationType}</span>
+          {v.description && (
+            <span className="text-[11px] text-slate-500 line-clamp-1">{v.description}</span>
+          )}
         </div>
       ),
     },
     {
       key: 'points',
-      header: 'Poin',
+      header: 'Bobot Poin',
       sortable: true,
       align: 'center',
-      width: '80px',
+      width: '100px',
       render: (v) => (
-        <span className="font-mono font-bold text-rose-700 bg-rose-50 px-2 py-0.5 rounded border border-rose-200 tabular-nums">
+        <span className="font-mono font-bold text-rose-700 bg-rose-50 border border-rose-200 px-2.5 py-0.5 rounded">
           +{v.points}
         </span>
       ),
     },
     {
       key: 'reporterName',
-      header: 'Guru Pelapor',
+      header: 'Guru Pencatat',
       sortable: true,
       render: (v) => (
-        <span className="text-xs text-slate-600 truncate block max-w-[140px]">{v.reporterName}</span>
+        <span className="text-xs text-slate-700 font-medium">
+          {v.reporterName} ({v.reporterCode})
+        </span>
       ),
     },
     {
@@ -164,18 +222,26 @@ export const ViolationView: React.FC = () => {
       header: 'Aksi',
       sortable: false,
       align: 'right',
-      width: '70px',
-      render: (v) => (
-        <button
-          onClick={() => {
-            if (confirm('Hapus catatan pelanggaran ini?')) deleteViolation(v.id);
-          }}
-          className="p-1.5 text-slate-400 hover:text-rose-600 rounded transition-colors"
-          title="Hapus Pelanggaran"
-        >
-          <Trash2 className="w-3.5 h-3.5" />
-        </button>
-      ),
+      width: '80px',
+      render: (v) => {
+        // Only Admin, BK, or the reporter can delete
+        const canDelete = isBkOrAdmin || v.reporterCode === currentUser?.teacherCode;
+        if (!canDelete) return null;
+
+        return (
+          <button
+            onClick={() => {
+              if (confirm(`Hapus catatan pelanggaran untuk ${v.studentName}?`)) {
+                deleteViolation(v.id);
+              }
+            }}
+            className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded transition-colors cursor-pointer"
+            title="Hapus pelanggaran"
+          >
+            <Trash2 className="w-3.5 h-3.5" />
+          </button>
+        );
+      },
     },
   ];
 
@@ -184,106 +250,137 @@ export const ViolationView: React.FC = () => {
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
-          <h2 className="text-xl font-bold text-slate-900 tracking-tight">
-            Catatan Poin Pelanggaran Siswa
-          </h2>
+          <div className="flex items-center gap-2">
+            <h2 className="text-xl font-bold text-slate-900 tracking-tight">
+              Buku Catatan Kedisiplinan & Poin Pelanggaran Siswa
+            </h2>
+            {isKepsek && (
+              <span className="text-[10px] font-bold px-2 py-0.5 bg-rose-100 text-rose-800 rounded-full flex items-center gap-1">
+                <Lock className="w-3 h-3" />
+                Mode Pengawasan Pimpinan (&gt;30 Poin)
+              </span>
+            )}
+            {isWaliKelas && (
+              <span className="text-[10px] font-bold px-2 py-0.5 bg-indigo-100 text-indigo-800 rounded-full">
+                Wali Kelas {currentUser?.classId}
+              </span>
+            )}
+          </div>
           <p className="text-xs text-slate-500 mt-0.5">
-            Sistem akumulasi poin kedisiplinan dengan deteksi otomatis rekomendasi pembinaan Bimbingan Konseling (&gt;30 Poin)
+            {isKepsek
+              ? 'Pengawasan Kasus Parah: Kepala Sekolah memantau siswa dengan akumulasi poin di atas 30 dan laporan penyelesaian konseling.'
+              : isWaliKelas
+              ? `Menampilkan catatan poin disiplin peserta didik khusus Kelas ${currentUser?.classId || ''} yang berhak dibimbing oleh Wali Kelas.`
+              : 'Terkoneksi langsung dengan Master Kategori Pelanggaran (Ringan, Sedang, Berat) serta Guru Mapel dan Wali Kelas.'}
           </p>
         </div>
 
-        <button
-          onClick={handleOpenAdd}
-          className="flex items-center gap-1.5 px-3.5 py-2 bg-rose-700 hover:bg-rose-800 text-white rounded-lg text-xs font-semibold shadow-xs transition-colors cursor-pointer shrink-0"
-        >
-          <Plus className="w-4 h-4" />
-          <span>Catat Pelanggaran</span>
-        </button>
+        {/* Can Add: Guru Mapel, Walas, BK, Admin (Kepsek is monitoring only) */}
+        {!isKepsek && (
+          <button
+            onClick={handleOpenAdd}
+            className="flex items-center gap-1.5 px-3.5 py-2 bg-rose-600 hover:bg-rose-700 text-white rounded-lg text-xs font-semibold shadow-xs transition-colors cursor-pointer shrink-0"
+          >
+            <Plus className="w-4 h-4" />
+            <span>Catat Pelanggaran Siswa</span>
+          </button>
+        )}
       </div>
 
-      {/* Point Range Legend */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
-        <div className="bg-emerald-50/70 border border-emerald-200 p-2.5 rounded-xl text-xs">
-          <span className="font-bold text-emerald-800 block">Normal (0–10 Poin)</span>
-          <span className="text-[10px] text-emerald-600">Pelanggaran ringan, teguran lisan</span>
+      {/* Filter Toolbar */}
+      <div className="bg-white border border-slate-200 rounded-xl p-3 flex flex-wrap items-center justify-between gap-3 shadow-xs">
+        <div className="flex flex-wrap items-center gap-3">
+          {!isWaliKelas && (
+            <div>
+              <label className="block text-[11px] font-semibold text-slate-500 mb-1">Filter Rombel</label>
+              <select
+                value={selectedClass}
+                onChange={(e) => setSelectedClass(e.target.value)}
+                className="bg-slate-50 border border-slate-200 rounded px-2.5 py-1 text-xs font-semibold text-slate-800"
+              >
+                <option value="ALL">Semua Kelas</option>
+                {classes.map((c) => (
+                  <option key={c.classId} value={c.classId}>
+                    Kelas {c.classId}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
+
+          <div>
+            <label className="block text-[11px] font-semibold text-slate-500 mb-1">Kategori Pelanggaran</label>
+            <select
+              value={selectedCategoryFilter}
+              onChange={(e) => setSelectedCategoryFilter(e.target.value)}
+              className="bg-slate-50 border border-slate-200 rounded px-2.5 py-1 text-xs font-semibold text-slate-800"
+            >
+              <option value="ALL">Semua Kategori</option>
+              <option value="Ringan">Ringan (5–10 Poin)</option>
+              <option value="Sedang">Sedang (15–20 Poin)</option>
+              <option value="Berat">Berat (25–50 Poin)</option>
+            </select>
+          </div>
         </div>
-        <div className="bg-amber-50/70 border border-amber-200 p-2.5 rounded-xl text-xs">
-          <span className="font-bold text-amber-800 block">Perhatian (11–20 Poin)</span>
-          <span className="text-[10px] text-amber-600">Peringatan tertulis oleh wali kelas</span>
-        </div>
-        <div className="bg-orange-50/70 border border-orange-200 p-2.5 rounded-xl text-xs">
-          <span className="font-bold text-orange-800 block">Peringatan (21–30 Poin)</span>
-          <span className="text-[10px] text-orange-600">Pemanggilan orang tua oleh wali kelas</span>
-        </div>
-        <div className="bg-rose-50/80 border border-rose-300 p-2.5 rounded-xl text-xs shadow-2xs">
-          <span className="font-bold text-rose-800 block">Pembinaan BK (&gt; 30 Poin)</span>
-          <span className="text-[10px] text-rose-600 font-semibold">Otomatis masuk daftar prioritas BK</span>
-        </div>
+
+        <span className="text-xs text-slate-500 font-mono">
+          <strong className="text-slate-900">{filteredViolations.length}</strong> Pelanggaran Terdaftar
+        </span>
       </div>
 
-      {/* Filter */}
-      <div className="flex items-center gap-2 bg-white p-3 rounded-xl border border-slate-200">
-        <span className="text-xs font-semibold text-slate-600">Filter Kelas:</span>
-        <select
-          value={selectedClass}
-          onChange={(e) => setSelectedClass(e.target.value)}
-          className="bg-slate-50 border border-slate-200 rounded px-2.5 py-1 text-xs font-medium text-slate-800"
-        >
-          <option value="ALL">Semua Kelas</option>
-          {classes.map((c) => (
-            <option key={c.classId} value={c.classId}>
-              {c.classId}
-            </option>
-          ))}
-        </select>
-      </div>
-
+      {/* Table */}
       <DataTable
         data={filteredViolations}
         columns={columns}
-        searchPlaceholder="Cari siswa, jenis pelanggaran, atau guru pelapor..."
-        searchKeys={['studentName', 'violationType', 'description', 'reporterName', 'classId']}
-        exportFilename={`Data_Pelanggaran_Siswa_${Date.now()}`}
-        sheetName="Pelanggaran"
+        searchPlaceholder="Cari siswa, kelas, jenis pelanggaran, atau guru pelapor..."
+        searchKeys={['studentName', 'classId', 'violationType', 'reporterName', 'category']}
+        exportFilename={`Data_Pelanggaran_${Date.now()}`}
+        sheetName="Catatan Pelanggaran"
       />
 
-      {/* Add Violation Modal */}
+      {/* Add Violation Modal Connected to Master Rules */}
       {isModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-xs">
-          <div className="bg-white rounded-xl shadow-xl border border-slate-200 max-w-lg w-full p-6 text-xs max-h-[90vh] overflow-y-auto">
+          <div className="bg-white rounded-xl shadow-xl border border-slate-200 max-w-lg w-full p-6 text-xs animate-in zoom-in-95">
             <div className="flex items-center justify-between pb-3 border-b border-slate-100 mb-4">
-              <h3 className="text-sm font-bold text-slate-900 flex items-center gap-2">
-                <AlertTriangle className="w-4 h-4 text-rose-600" />
-                <span>Pencatatan Poin Pelanggaran Siswa</span>
-              </h3>
+              <div>
+                <h3 className="text-sm font-bold text-slate-900">
+                  Pencatatan Poin Pelanggaran Siswa
+                </h3>
+                <p className="text-[11px] text-slate-500">
+                  Tersinkron dengan Master Aturan Disiplin (Ringan, Sedang, Berat)
+                </p>
+              </div>
               <button
                 onClick={() => setIsModalOpen(false)}
-                className="text-slate-400 hover:text-slate-600"
+                className="text-slate-400 hover:text-slate-600 cursor-pointer"
               >
                 <X className="w-4 h-4" />
               </button>
             </div>
 
             <form onSubmit={handleSubmit} className="space-y-3">
-              <div>
-                <label className="block font-semibold text-slate-700 mb-1">
-                  Pilih Peserta Didik
-                </label>
-                <select
-                  value={formData.studentId}
-                  onChange={(e) => setFormData({ ...formData, studentId: e.target.value })}
-                  required
-                  className="w-full px-3 py-1.5 border border-slate-300 rounded-lg focus:outline-none focus:ring-1 focus:ring-rose-600 bg-white text-slate-900"
-                >
-                  {students.slice(0, 150).map((st) => (
-                    <option key={st.id} value={st.id}>
-                      [{st.classId}] {st.name} (NIS: {st.nis}) · Total {getStudentPoints(st.id)} Poin
-                    </option>
-                  ))}
-                </select>
-              </div>
-
               <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block font-semibold text-slate-700 mb-1">Nama Peserta Didik</label>
+                  <select
+                    value={formData.studentId}
+                    onChange={(e) => setFormData({ ...formData, studentId: e.target.value })}
+                    required
+                    className="w-full px-3 py-1.5 border border-slate-300 rounded-lg bg-white text-slate-900 font-medium"
+                  >
+                    <option value="">Pilih Siswa...</option>
+                    {(isWaliKelas
+                      ? students.filter((s) => s.classId === currentUser?.classId)
+                      : students
+                    ).map((st) => (
+                      <option key={st.id} value={st.id}>
+                        {st.name} ({st.nis} - Kelas {st.classId})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
                 <div>
                   <label className="block font-semibold text-slate-700 mb-1">Tanggal Kejadian</label>
                   <input
@@ -291,105 +388,90 @@ export const ViolationView: React.FC = () => {
                     value={formData.date}
                     onChange={(e) => setFormData({ ...formData, date: e.target.value })}
                     required
-                    className="w-full px-3 py-1.5 border border-slate-300 rounded-lg font-mono text-slate-900"
+                    className="w-full px-3 py-1.5 border border-slate-300 rounded-lg bg-white text-slate-900 font-mono"
                   />
-                </div>
-
-                <div>
-                  <label className="block font-semibold text-slate-700 mb-1">Kategori Pelanggaran</label>
-                  <select
-                    value={formData.category}
-                    onChange={(e) => setFormData({ ...formData, category: e.target.value as any })}
-                    className="w-full px-3 py-1.5 border border-slate-300 rounded-lg bg-white text-slate-900"
-                  >
-                    <option value="Kedisiplinan">Kedisiplinan</option>
-                    <option value="Ketertiban">Ketertiban</option>
-                    <option value="Kerapian">Kerapian</option>
-                    <option value="Sikap & Etika">Sikap & Etika</option>
-                    <option value="Berat">Berat</option>
-                  </select>
                 </div>
               </div>
 
+              {/* Master Rule Selector */}
               <div>
                 <label className="block font-semibold text-slate-700 mb-1">
-                  Pilih Jenis Pelanggaran (Standar Tata Tertib)
+                  Pilih dari Master Aturan Pelanggaran ({violationRules.length} Aturan Tersedia)
                 </label>
                 <select
-                  value={formData.violationType}
-                  onChange={(e) => handlePresetChange(e.target.value)}
-                  className="w-full px-3 py-1.5 border border-slate-300 rounded-lg bg-white text-slate-900 font-medium"
+                  value={selectedRuleCode}
+                  onChange={(e) => handleRuleChange(e.target.value)}
+                  className="w-full px-3 py-1.5 border border-slate-300 rounded-lg bg-white text-slate-900 font-semibold"
                 >
-                  {Object.keys(violationPresets).map((type) => (
-                    <option key={type} value={type}>
-                      {type} (+{violationPresets[type].points} Poin)
+                  {violationRules.map((rule) => (
+                    <option key={rule.id} value={rule.code}>
+                      [{rule.code}] {rule.name} · ({rule.category} - +{rule.points} Poin)
                     </option>
                   ))}
                 </select>
               </div>
 
-              <div className="grid grid-cols-3 gap-3">
+              <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block font-semibold text-slate-700 mb-1">Jumlah Poin</label>
+                  <label className="block font-semibold text-slate-700 mb-1">Kategori Pelanggaran</label>
+                  <select
+                    value={formData.category}
+                    onChange={(e) => setFormData({ ...formData, category: e.target.value as any })}
+                    className="w-full px-3 py-1.5 border border-slate-300 rounded-lg bg-white font-semibold text-slate-900"
+                  >
+                    <option value="Ringan">Ringan (5–10 Poin)</option>
+                    <option value="Sedang">Sedang (15–20 Poin)</option>
+                    <option value="Berat">Berat (25–50 Poin)</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block font-semibold text-slate-700 mb-1">Bobot Poin Sanksi</label>
                   <input
                     type="number"
+                    min={1}
+                    max={100}
                     value={formData.points}
                     onChange={(e) => setFormData({ ...formData, points: Number(e.target.value) })}
-                    min="1"
-                    max="100"
                     required
-                    className="w-full px-3 py-1.5 border border-slate-300 rounded-lg font-mono font-bold text-rose-700 text-slate-900"
-                  />
-                </div>
-
-                <div className="col-span-2">
-                  <label className="block font-semibold text-slate-700 mb-1">Nama Guru Pelapor</label>
-                  <input
-                    type="text"
-                    value={formData.reporterName}
-                    onChange={(e) => setFormData({ ...formData, reporterName: e.target.value })}
-                    required
-                    className="w-full px-3 py-1.5 border border-slate-300 rounded-lg text-slate-900"
+                    className="w-full px-3 py-1.5 border border-slate-300 rounded-lg font-mono font-bold text-rose-700 bg-white"
                   />
                 </div>
               </div>
 
               <div>
-                <label className="block font-semibold text-slate-700 mb-1">Deskripsi & Kronologi Kejadian</label>
+                <label className="block font-semibold text-slate-700 mb-1">Keterangan / Kronologi Kejadian</label>
                 <textarea
+                  rows={2}
                   value={formData.description}
                   onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                  rows={2}
-                  required
-                  placeholder="Jelaskan secara ringkas tempat, waktu, dan kejadian..."
-                  className="w-full px-3 py-1.5 border border-slate-300 rounded-lg focus:outline-none focus:ring-1 focus:ring-rose-600 text-slate-900"
-                />
-              </div>
-
-              <div>
-                <label className="block font-semibold text-slate-700 mb-1">Catatan Tambahan / Tindak Lanjut</label>
-                <input
-                  type="text"
-                  value={formData.notes}
-                  onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
-                  placeholder="Contoh: Barang bukti disita guru piket"
+                  placeholder="Jelaskan secara ringkas situasi pelanggaran..."
                   className="w-full px-3 py-1.5 border border-slate-300 rounded-lg text-slate-900"
                 />
               </div>
 
-              <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-100 mt-4">
+              <div className="p-2.5 bg-slate-50 border border-slate-200 rounded-lg text-[11px] text-slate-600 space-y-1">
+                <div className="font-semibold text-slate-800">Alur Bimbingan Bertahap Otomatis:</div>
+                <ul className="list-disc pl-4 space-y-0.5">
+                  <li><strong>15 Poin:</strong> Bimbingan tahap awal oleh Wali Kelas.</li>
+                  <li><strong>25 Poin:</strong> Sistem otomatis mengirim notifikasi ke Guru BK.</li>
+                  <li><strong>&gt; 30 Poin:</strong> Notifikasi pelanggaran parah langsung ke Kepala Sekolah.</li>
+                </ul>
+              </div>
+
+              <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-100">
                 <button
                   type="button"
                   onClick={() => setIsModalOpen(false)}
-                  className="px-3 py-1.5 border border-slate-300 rounded-lg text-slate-600 hover:bg-slate-50 transition-colors"
+                  className="px-3 py-1.5 border border-slate-300 rounded-lg text-slate-600 hover:bg-slate-50 transition-colors cursor-pointer"
                 >
                   Batal
                 </button>
                 <button
                   type="submit"
-                  className="px-4 py-1.5 bg-rose-700 hover:bg-rose-800 text-white rounded-lg font-semibold transition-colors shadow-2xs"
+                  className="px-4 py-1.5 bg-rose-600 hover:bg-rose-700 text-white rounded-lg font-semibold transition-colors shadow-2xs cursor-pointer"
                 >
-                  Simpan Pelanggaran
+                  Simpan Catatan Pelanggaran
                 </button>
               </div>
             </form>

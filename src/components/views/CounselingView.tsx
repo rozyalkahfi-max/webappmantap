@@ -130,6 +130,39 @@ export const CounselingView: React.FC = () => {
         </div>
       </div>
 
+      {/* Tiered Guidance System (Tahap 15 Walas, 25 BK, >30 Kepsek) */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+        <div className="bg-amber-50/70 border border-amber-200 rounded-xl p-3.5 space-y-1">
+          <div className="flex items-center justify-between">
+            <span className="text-[11px] font-bold text-amber-800 uppercase tracking-wide">Tahap 1 (15–24 Poin)</span>
+            <span className="text-[10px] bg-amber-200/60 text-amber-900 font-semibold px-2 py-0.5 rounded">Wali Kelas</span>
+          </div>
+          <p className="text-xs text-amber-900 leading-relaxed">
+            Pembimbingan tahap awal dilakukan terlebih dahulu oleh <strong>Wali Kelas</strong> pada rombel siswa bersangkutan.
+          </p>
+        </div>
+
+        <div className="bg-orange-50/70 border border-orange-200 rounded-xl p-3.5 space-y-1">
+          <div className="flex items-center justify-between">
+            <span className="text-[11px] font-bold text-orange-800 uppercase tracking-wide">Tahap 2 (25–30 Poin)</span>
+            <span className="text-[10px] bg-orange-200/60 text-orange-900 font-semibold px-2 py-0.5 rounded">Guru BK</span>
+          </div>
+          <p className="text-xs text-orange-900 leading-relaxed">
+            Mendekati ambang 25 poin, sistem otomatis mengirimkan <strong>pemberitahuan ke Guru BK</strong> untuk konseling terarah.
+          </p>
+        </div>
+
+        <div className="bg-rose-50/70 border border-rose-200 rounded-xl p-3.5 space-y-1">
+          <div className="flex items-center justify-between">
+            <span className="text-[11px] font-bold text-rose-800 uppercase tracking-wide">Tahap 3 (&gt;30 Poin) & Selesai</span>
+            <span className="text-[10px] bg-rose-200/60 text-rose-900 font-semibold px-2 py-0.5 rounded">Kepala Sekolah</span>
+          </div>
+          <p className="text-xs text-rose-900 leading-relaxed">
+            Pelanggaran parah (&gt;30 poin) langsung dilaporkan ke <strong>Kepala Sekolah</strong>, dan setiap pembimbingan yang selesai otomatis dikonfirmasi ke pimpinan.
+          </p>
+        </div>
+      </div>
+
       {/* Auto-Detection Priority Banner */}
       <div className="bg-gradient-to-r from-rose-900 via-rose-800 to-slate-900 text-white p-5 rounded-2xl shadow-md border border-rose-700 flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div className="space-y-1">

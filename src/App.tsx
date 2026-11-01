@@ -26,9 +26,11 @@ import { ReportsView } from './components/views/ReportsView';
 import { UserManagementView } from './components/views/UserManagementView';
 import { SchoolSettingsView } from './components/views/SchoolSettingsView';
 import { ActivityLogView } from './components/views/ActivityLogView';
+import { PortalSelectionModal } from './components/common/PortalSelectionModal';
+import { MobileBottomNav } from './components/common/MobileBottomNav';
 
 const MainLayout: React.FC = () => {
-  const { currentUser, activeRole } = useAuth();
+  const { currentUser, activeRole, showPortalSelector, setShowPortalSelector } = useAuth();
 
   // Pick default menu based on role
   const getDefaultMenuForRole = (role: string) => {
@@ -117,7 +119,7 @@ const MainLayout: React.FC = () => {
       case 'teachers':
         return <TeacherMasterView />;
       case 'classes':
-        return <ClassMasterView />;
+        return <ClassMasterView onNavigate={setCurrentMenu} />;
       case 'subjects':
         return <SubjectMasterView />;
 
@@ -174,6 +176,9 @@ const MainLayout: React.FC = () => {
         return <UserManagementView />;
       case 'settings':
       case 'settings_academic':
+        if (activeRole !== 'admin_operator') {
+          return <AdminDashboard onNavigate={setCurrentMenu} />;
+        }
         return <SchoolSettingsView />;
       case 'activity':
         return <ActivityLogView />;
@@ -185,6 +190,14 @@ const MainLayout: React.FC = () => {
 
   return (
     <div className="flex h-screen bg-slate-100 overflow-hidden text-slate-900 font-sans">
+      {/* Multi-role Portal Selector Modal Gate */}
+      {showPortalSelector && (
+        <PortalSelectionModal
+          canDismiss={true}
+          onClose={() => setShowPortalSelector(false)}
+        />
+      )}
+
       {/* Sidebar Navigation */}
       <Sidebar
         currentMenu={currentMenu}
@@ -201,11 +214,18 @@ const MainLayout: React.FC = () => {
           onNavigateToMenu={(menuId) => setCurrentMenu(menuId)}
         />
 
-        <main className="flex-1 overflow-y-auto p-4 sm:p-6 lg:p-8">
+        <main className="flex-1 overflow-y-auto p-3 sm:p-6 lg:p-8 pb-28 lg:pb-8">
           <div className="max-w-7xl mx-auto">
             {renderContent()}
           </div>
         </main>
+
+        {/* Mobile Phone Browser Bottom Navigation Bar */}
+        <MobileBottomNav
+          currentMenu={currentMenu}
+          onSelectMenu={(menuId) => setCurrentMenu(menuId)}
+          onOpenSidebar={() => setIsSidebarOpen(true)}
+        />
       </div>
     </div>
   );

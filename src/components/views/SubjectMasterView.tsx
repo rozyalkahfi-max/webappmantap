@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import {
   Plus,
   Edit2,
@@ -9,10 +9,15 @@ import {
   AlertTriangle,
   CheckCircle2,
   CheckSquare,
+  Upload,
+  Download,
+  FileSpreadsheet,
 } from 'lucide-react';
 import { useSchool } from '../../context/SchoolContext';
 import { DataTable, ColumnDef } from '../common/DataTable';
 import { Subject } from '../../types';
+import * as XLSX from 'xlsx';
+import { generateSubjectTemplate, validateSubjectsImport } from '../../utils/excel';
 
 export const SubjectMasterView: React.FC = () => {
   const {
@@ -23,7 +28,10 @@ export const SubjectMasterView: React.FC = () => {
     deleteSubjectsBatch,
     deleteAllSubjects,
     resetDefaultSubjects,
+    importSubjectsBatch,
   } = useSchool();
+
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingSubject, setEditingSubject] = useState<Subject | null>(null);
@@ -38,19 +46,17 @@ export const SubjectMasterView: React.FC = () => {
     action: () => void;
   } | null>(null);
 
-  const [notification, setNotification] = useState<string | null>(null);
+  const [notification, setNotification] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
 
-  const showNotify = (msg: string) => {
-    setNotification(msg);
-    setTimeout(() => setNotification(null), 3500);
+  const showNotify = (msg: string, type: 'success' | 'error' = 'success') => {
+    setNotification({ type, message: msg });
+    setTimeout(() => setNotification(null), 4000);
   };
 
   const [formData, setFormData] = useState({
     code: '',
     name: '',
-    group: 'Muatan Nasional' as 'Muatan Nasional' | 'Muatan Kewilayahan' | 'Muatan Lokal',
     hoursPerWeek: 3,
-    passingGrade: 75,
     status: 'Aktif' as 'Aktif' | 'Nonaktif',
   });
 
@@ -150,9 +156,7 @@ export const SubjectMasterView: React.FC = () => {
     setFormData({
       code: '',
       name: '',
-      group: 'Muatan Nasional',
       hoursPerWeek: 3,
-      passingGrade: 75,
       status: 'Aktif',
     });
     setIsModalOpen(true);
@@ -163,9 +167,7 @@ export const SubjectMasterView: React.FC = () => {
     setFormData({
       code: s.code,
       name: s.name,
-      group: s.group,
       hoursPerWeek: s.hoursPerWeek,
-      passingGrade: s.passingGrade,
       status: s.status,
     });
     setIsModalOpen(true);
@@ -174,7 +176,7 @@ export const SubjectMasterView: React.FC = () => {
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!formData.code.trim() || !formData.name.trim()) {
-      alert('Kode Mapel dan Nama Mapel wajib diisi.');
+      alert('Id Mapel dan Nama Mapel wajib diisi.');
       return;
     }
 
@@ -188,6 +190,45 @@ export const SubjectMasterView: React.FC = () => {
     setIsModalOpen(false);
   };
 
+  // Excel Upload Handler (Format: Id Mapel, Nama Mapel, Jam Mapel Per Minggu)
+  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (evt) => {
+      try {
+        const bstr = evt.target?.result;
+        const wb = XLSX.read(bstr, { type: 'binary' });
+        const wsname = wb.SheetNames[0];
+        const ws = wb.Sheets[wsname];
+        const rawData = XLSX.utils.sheet_to_json(ws);
+
+        if (!rawData || rawData.length === 0) {
+          showNotify('Berkas Excel kosong atau tidak terbaca.', 'error');
+          return;
+        }
+
+        const summary = validateSubjectsImport(rawData, subjects);
+        const validSubjects = summary.items.filter((i) => i.isValid).map((i) => i.data);
+
+        if (validSubjects.length === 0) {
+          showNotify(`Gagal import: ${summary.invalidRows} baris tidak memenuhi format (Id Mapel, Nama Mapel, Jam Mapel Per Minggu).`, 'error');
+          return;
+        }
+
+        const res = importSubjectsBatch(validSubjects);
+        showNotify(`Berhasil import ${res.added} mata pelajaran baru dari berkas Excel.`);
+      } catch (err: any) {
+        showNotify(`Gagal membaca berkas Excel: ${err?.message || 'Format tidak sesuai'}`, 'error');
+      } finally {
+        if (fileInputRef.current) fileInputRef.current.value = '';
+      }
+    };
+    reader.readAsBinaryString(file);
+  };
+
+  // Table Columns: Id Mapel, Nama Mapel, Jam Mapel Per Minggu, Status, Aksi (NO Kelompok Kurikulum, NO KKM)
   const columns: ColumnDef<Subject>[] = [
     {
       key: 'select',
@@ -207,52 +248,38 @@ export const SubjectMasterView: React.FC = () => {
     },
     {
       key: 'code',
-      header: 'Kode',
+      header: 'Id Mapel',
       sortable: true,
       align: 'center',
-      width: '80px',
+      width: '100px',
       render: (s) => (
-        <span className="font-mono font-bold text-xs text-blue-700 bg-blue-50 px-2 py-0.5 rounded border border-blue-200">
+        <span className="font-mono font-bold text-xs text-blue-700 bg-blue-50 px-2.5 py-1 rounded border border-blue-200">
           {s.code}
         </span>
       ),
     },
     {
       key: 'name',
-      header: 'Nama Mata Pelajaran',
+      header: 'Nama Mapel',
       sortable: true,
       render: (s) => (
-        <span className="font-semibold text-slate-900">{s.name}</span>
-      ),
-    },
-    {
-      key: 'group',
-      header: 'Kelompok Kurikulum',
-      sortable: true,
-      render: (s) => (
-        <span className="text-xs text-slate-600">{s.group}</span>
+        <div>
+          <span className="font-semibold text-slate-900 block">{s.name}</span>
+          <span className="text-[11px] text-slate-500 font-medium">Kurikulum Merdeka</span>
+        </div>
       ),
     },
     {
       key: 'hoursPerWeek',
-      header: 'Alokasi Jam',
+      header: 'Jam Mapel Per Minggu',
       sortable: true,
       align: 'center',
-      width: '120px',
+      width: '180px',
       render: (s) => (
-        <span className="font-mono tabular-nums text-slate-800">{s.hoursPerWeek} JP / Minggu</span>
-      ),
-    },
-    {
-      key: 'passingGrade',
-      header: 'KKM (Ketuntasan)',
-      sortable: true,
-      align: 'center',
-      width: '130px',
-      render: (s) => (
-        <span className="font-mono font-bold text-slate-900 bg-slate-100 px-2 py-0.5 rounded">
-          {s.passingGrade}
-        </span>
+        <div className="inline-flex items-center gap-1.5 px-3 py-1 bg-slate-100 rounded-lg text-slate-800 font-mono font-semibold text-xs">
+          <span>{s.hoursPerWeek} JP</span>
+          <span className="text-slate-400 font-normal text-[11px]">/ Minggu</span>
+        </div>
       ),
     },
     {
@@ -260,11 +287,13 @@ export const SubjectMasterView: React.FC = () => {
       header: 'Status',
       sortable: true,
       align: 'center',
-      width: '90px',
+      width: '110px',
       render: (s) => (
         <span
-          className={`text-[11px] font-semibold ${
-            s.status === 'Aktif' ? 'text-emerald-700' : 'text-slate-500'
+          className={`text-[11px] font-semibold px-2 py-0.5 rounded-full ${
+            s.status === 'Aktif'
+              ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+              : 'bg-slate-100 text-slate-600 border border-slate-200'
           }`}
         >
           {s.status}
@@ -298,31 +327,77 @@ export const SubjectMasterView: React.FC = () => {
     },
   ];
 
+  const totalWeeklyHours = subjects.reduce((sum, s) => sum + (s.hoursPerWeek || 0), 0);
+
   return (
     <div className="space-y-4">
+      {/* Hidden File Input for Direct Excel Upload */}
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept=".xlsx,.xls,.csv"
+        onChange={handleFileUpload}
+        className="hidden"
+      />
+
       {/* Toast Notification */}
       {notification && (
-        <div className="p-3 bg-emerald-50 border border-emerald-200 text-emerald-800 rounded-xl flex items-center gap-2 text-xs font-semibold shadow-xs animate-in fade-in">
-          <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
-          <span>{notification}</span>
+        <div
+          className={`p-3 rounded-xl flex items-center gap-2 text-xs font-semibold shadow-xs animate-in fade-in ${
+            notification.type === 'success'
+              ? 'bg-emerald-50 border border-emerald-200 text-emerald-800'
+              : 'bg-rose-50 border border-rose-200 text-rose-800'
+          }`}
+        >
+          {notification.type === 'success' ? (
+            <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+          ) : (
+            <AlertTriangle className="w-4 h-4 text-rose-600 shrink-0" />
+          )}
+          <span>{notification.message}</span>
         </div>
       )}
 
       {/* Header and Quick Stats */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3">
         <div>
-          <h2 className="text-xl font-bold text-slate-900 tracking-tight">
-            Data Master Mata Pelajaran
-          </h2>
+          <div className="flex items-center gap-2">
+            <h2 className="text-xl font-bold text-slate-900 tracking-tight">
+              Data Master Mata Pelajaran
+            </h2>
+            <span className="text-[10px] font-bold px-2 py-0.5 bg-blue-100 text-blue-800 rounded-full">
+              Kurikulum Merdeka
+            </span>
+          </div>
           <p className="text-xs text-slate-500 mt-0.5">
-            Total <strong className="text-slate-800 font-mono">{subjects.length}</strong> mata pelajaran kurikulum merdeka/nasional dan muatan lokal
+            Total <strong className="text-slate-800 font-mono">{subjects.length}</strong> mata pelajaran · Alokasi total <strong className="text-blue-700 font-mono">{totalWeeklyHours} JP</strong> per minggu
           </p>
         </div>
 
-        <div className="flex items-center gap-2 shrink-0">
+        <div className="flex flex-wrap items-center gap-2">
+          {/* Download Template Excel */}
+          <button
+            onClick={generateSubjectTemplate}
+            className="flex items-center gap-1.5 px-3 py-1.5 bg-white hover:bg-slate-50 border border-slate-300 text-slate-700 rounded-lg text-xs font-semibold transition-colors shadow-2xs cursor-pointer"
+            title="Download Template Format Excel (Id Mapel, Nama Mapel, Jam Mapel Per Minggu)"
+          >
+            <Download className="w-3.5 h-3.5 text-slate-500" />
+            <span>Format Excel</span>
+          </button>
+
+          {/* Upload Data Mata Pelajaran Button */}
+          <button
+            onClick={() => fileInputRef.current?.click()}
+            className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-bold shadow-xs transition-colors cursor-pointer"
+            title="Upload Berkas Excel (Id Mapel, Nama Mapel, Jam Mapel Per Minggu)"
+          >
+            <Upload className="w-3.5 h-3.5" />
+            <span>Upload Data Mapel</span>
+          </button>
+
           <button
             onClick={handleResetDefault}
-            className="flex items-center gap-1.5 px-3 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-xs font-semibold transition-colors cursor-pointer"
+            className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-xs font-semibold transition-colors cursor-pointer"
             title="Pulihkan 12 mata pelajaran standar"
           >
             <RotateCcw className="w-3.5 h-3.5 text-slate-500" />
@@ -331,7 +406,7 @@ export const SubjectMasterView: React.FC = () => {
 
           <button
             onClick={handleOpenAdd}
-            className="flex items-center gap-1.5 px-3.5 py-2 bg-blue-700 hover:bg-blue-800 text-white rounded-lg text-xs font-semibold shadow-xs transition-colors cursor-pointer"
+            className="flex items-center gap-1.5 px-3.5 py-1.5 bg-blue-700 hover:bg-blue-800 text-white rounded-lg text-xs font-semibold shadow-xs transition-colors cursor-pointer"
           >
             <Plus className="w-4 h-4" />
             <span>Tambah Mapel</span>
@@ -340,7 +415,7 @@ export const SubjectMasterView: React.FC = () => {
       </div>
 
       {/* Quick Action & Batch Toolbar */}
-      <div className="bg-slate-50 border border-slate-200 rounded-xl p-3.5 space-y-3">
+      <div className="bg-slate-50 border border-slate-200 rounded-xl p-3 space-y-2.5">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           <div className="flex items-center gap-2">
             <button
@@ -372,7 +447,7 @@ export const SubjectMasterView: React.FC = () => {
               className="flex items-center gap-1.5 px-3 py-1.5 bg-rose-600 hover:bg-rose-700 text-white rounded-lg text-xs font-semibold shadow-xs transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
             >
               <Trash2 className="w-3.5 h-3.5" />
-              <span>Hapus Semua Mata Pelajaran ({subjects.length})</span>
+              <span>Hapus Semua Mapel ({subjects.length})</span>
             </button>
           </div>
         </div>
@@ -410,8 +485,8 @@ export const SubjectMasterView: React.FC = () => {
       <DataTable
         data={subjects}
         columns={columns}
-        searchPlaceholder="Cari berdasarkan nama mapel atau kode..."
-        searchKeys={['code', 'name', 'group']}
+        searchPlaceholder="Cari berdasarkan nama mapel atau Id Mapel..."
+        searchKeys={['code', 'name']}
         exportFilename={`Data_Mapel_SMPN1Mantap_${Date.now()}`}
         sheetName="Data Mapel"
       />
@@ -447,21 +522,24 @@ export const SubjectMasterView: React.FC = () => {
                 }}
                 className="px-4 py-2 bg-rose-600 hover:bg-rose-700 text-white rounded-lg font-bold shadow-xs transition-colors cursor-pointer"
               >
-                Ya, Hapus Mapel
+                Ya, Lanjutkan
               </button>
             </div>
           </div>
         </div>
       )}
 
-      {/* Add / Edit Modal */}
+      {/* Add / Edit Modal (Only Id Mapel, Nama Mapel, Jam Mapel Per Minggu, Status) */}
       {isModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-xs">
           <div className="bg-white rounded-xl shadow-xl border border-slate-200 max-w-md w-full p-6 text-xs animate-in zoom-in-95">
             <div className="flex items-center justify-between pb-3 border-b border-slate-100 mb-4">
-              <h3 className="text-sm font-bold text-slate-900">
-                {editingSubject ? 'Edit Mata Pelajaran' : 'Tambah Mata Pelajaran Baru'}
-              </h3>
+              <div>
+                <h3 className="text-sm font-bold text-slate-900">
+                  {editingSubject ? 'Edit Mata Pelajaran' : 'Tambah Mata Pelajaran Baru'}
+                </h3>
+                <p className="text-[11px] text-slate-500">Kurikulum Merdeka</p>
+              </div>
               <button
                 onClick={() => setIsModalOpen(false)}
                 className="text-slate-400 hover:text-slate-600 cursor-pointer"
@@ -473,78 +551,52 @@ export const SubjectMasterView: React.FC = () => {
             <form onSubmit={handleSubmit} className="space-y-3">
               <div className="grid grid-cols-3 gap-3">
                 <div className="col-span-1">
-                  <label className="block font-semibold text-slate-700 mb-1">Kode Mapel</label>
+                  <label className="block font-semibold text-slate-700 mb-1">Id Mapel</label>
                   <input
                     type="text"
                     value={formData.code}
                     onChange={(e) => setFormData({ ...formData, code: e.target.value.toUpperCase() })}
                     required
-                    placeholder="BIN"
-                    maxLength={6}
+                    placeholder="Contoh: MAT"
+                    maxLength={8}
                     disabled={!!editingSubject}
                     className="w-full px-3 py-1.5 border border-slate-300 rounded-lg focus:outline-none focus:ring-1 focus:ring-blue-600 font-mono font-bold text-slate-900 uppercase disabled:bg-slate-100"
                   />
                 </div>
                 <div className="col-span-2">
-                  <label className="block font-semibold text-slate-700 mb-1">Nama Mata Pelajaran</label>
+                  <label className="block font-semibold text-slate-700 mb-1">Nama Mapel</label>
                   <input
                     type="text"
                     value={formData.name}
                     onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                     required
-                    placeholder="Contoh: Bahasa Indonesia"
+                    placeholder="Contoh: Matematika"
                     className="w-full px-3 py-1.5 border border-slate-300 rounded-lg focus:outline-none focus:ring-1 focus:ring-blue-600 text-slate-900"
                   />
                 </div>
               </div>
 
               <div>
-                <label className="block font-semibold text-slate-700 mb-1">Kelompok Kurikulum</label>
-                <select
-                  value={formData.group}
-                  onChange={(e) => setFormData({ ...formData, group: e.target.value as any })}
-                  className="w-full px-3 py-1.5 border border-slate-300 rounded-lg focus:outline-none focus:ring-1 focus:ring-blue-600 bg-white text-slate-900"
-                >
-                  <option value="Muatan Nasional">Kelompok A (Muatan Nasional)</option>
-                  <option value="Muatan Kewilayahan">Kelompok B (Muatan Kewilayahan / Seni / PJOK)</option>
-                  <option value="Muatan Lokal">Kelompok C (Muatan Lokal)</option>
-                </select>
-              </div>
-
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block font-semibold text-slate-700 mb-1">Alokasi Jam / Minggu</label>
-                  <input
-                    type="number"
-                    min={1}
-                    max={10}
-                    value={formData.hoursPerWeek}
-                    onChange={(e) => setFormData({ ...formData, hoursPerWeek: Number(e.target.value) })}
-                    required
-                    className="w-full px-3 py-1.5 border border-slate-300 rounded-lg focus:outline-none focus:ring-1 focus:ring-blue-600 font-mono text-slate-900"
-                  />
-                </div>
-
-                <div>
-                  <label className="block font-semibold text-slate-700 mb-1">KKM Ketuntasan</label>
-                  <input
-                    type="number"
-                    min={50}
-                    max={100}
-                    value={formData.passingGrade}
-                    onChange={(e) => setFormData({ ...formData, passingGrade: Number(e.target.value) })}
-                    required
-                    className="w-full px-3 py-1.5 border border-slate-300 rounded-lg focus:outline-none focus:ring-1 focus:ring-blue-600 font-mono text-slate-900"
-                  />
-                </div>
+                <label className="block font-semibold text-slate-700 mb-1">Jam Mapel Per Minggu (JP)</label>
+                <input
+                  type="number"
+                  min={1}
+                  max={12}
+                  value={formData.hoursPerWeek}
+                  onChange={(e) => setFormData({ ...formData, hoursPerWeek: Number(e.target.value) })}
+                  required
+                  placeholder="Contoh: 5"
+                  className="w-full px-3 py-1.5 border border-slate-300 rounded-lg focus:outline-none focus:ring-1 focus:ring-blue-600 font-mono text-slate-900 font-semibold"
+                />
+                <span className="text-[11px] text-slate-400 mt-1 block">Alokasi jam tatap muka per minggu</span>
               </div>
 
               <div>
-                <label className="block font-semibold text-slate-700 mb-1">Status Keaktifan</label>
+                <label className="block font-semibold text-slate-700 mb-1">Status</label>
                 <select
                   value={formData.status}
                   onChange={(e) => setFormData({ ...formData, status: e.target.value as any })}
-                  className="w-full px-3 py-1.5 border border-slate-300 rounded-lg focus:outline-none focus:ring-1 focus:ring-blue-600 bg-white text-slate-900"
+                  className="w-full px-3 py-1.5 border border-slate-300 rounded-lg focus:outline-none focus:ring-1 focus:ring-blue-600 bg-white text-slate-900 font-medium"
                 >
                   <option value="Aktif">Aktif Diajarkan</option>
                   <option value="Nonaktif">Nonaktif</option>

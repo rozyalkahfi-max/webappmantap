@@ -7,12 +7,16 @@ import {
   ScheduleItem,
   AttendanceSession,
   StudentGrade,
+  DailyScoreRecord,
   AttitudeAssessment,
   ViolationRecord,
+  ViolationRule,
   CounselingRecord,
   SchoolSettings,
   SystemNotification,
   ActivityLog,
+  WaliKelasImportRow,
+  UserRole,
 } from '../types';
 import { SchoolStorage, CLASS_IDS } from '../utils/storage';
 import { useAuth } from './AuthContext';
@@ -45,12 +49,14 @@ interface SchoolContextType {
   deleteAllTeachers: () => void;
   resetDefaultTeachers: () => void;
   importTeachersBatch: (newTeachers: any[]) => { added: number; merged: number };
+  importWaliKelasBatch: (rows: WaliKelasImportRow[]) => { added: number; updated: number; total: number };
 
   classes: ClassRoom[];
   addClass: (c: ClassRoom) => void;
   updateClass: (classId: string, updates: Partial<ClassRoom>) => void;
   deleteClass: (classId: string) => void;
   resetDefaultClasses: () => void;
+  importClassesBatch: (newClasses: Partial<ClassRoom>[]) => { added: number; updated: number };
 
   subjects: Subject[];
   addSubject: (subject: Subject) => void;
@@ -65,6 +71,9 @@ interface SchoolContextType {
   addSchedule: (item: Omit<ScheduleItem, 'id'>) => { success: boolean; conflict?: string };
   updateSchedule: (id: string, updates: Partial<ScheduleItem>) => { success: boolean; conflict?: string };
   deleteSchedule: (id: string) => void;
+  deleteSchedulesByClass: (classId: string) => number;
+  deleteAllSchedules: () => void;
+  resetDefaultSchedules: () => void;
   checkScheduleConflict: (item: Omit<ScheduleItem, 'id'>, excludeId?: string) => ScheduleConflict;
   importSchedulesBatch: (newSchedules: any[]) => { added: number };
 
@@ -75,12 +84,21 @@ interface SchoolContextType {
   grades: StudentGrade[];
   saveStudentGrade: (grade: Omit<StudentGrade, 'id' | 'finalScore' | 'letterGrade' | 'status'>) => void;
   saveBatchGrades: (gradesList: Partial<StudentGrade>[]) => void;
+  dailyScores: DailyScoreRecord[];
+  saveDailyScoreBatch: (scores: DailyScoreRecord[]) => void;
 
   violations: ViolationRecord[];
   addViolation: (record: Omit<ViolationRecord, 'id'>) => void;
   deleteViolation: (id: string) => void;
   getStudentPoints: (studentId: string) => number;
   getStudentViolationCategory: (points: number) => { label: string; color: string; badge: string };
+
+  violationRules: ViolationRule[];
+  addViolationRule: (rule: ViolationRule) => void;
+  updateViolationRule: (id: string, updates: Partial<ViolationRule>) => void;
+  deleteViolationRule: (id: string) => void;
+  resetDefaultViolationRules: () => void;
+  importViolationRulesBatch: (rules: ViolationRule[]) => { added: number };
 
   counselingRecords: CounselingRecord[];
   addCounselingRecord: (record: Omit<CounselingRecord, 'id'>) => void;
@@ -101,7 +119,7 @@ interface SchoolContextType {
 const SchoolContext = createContext<SchoolContextType | undefined>(undefined);
 
 export const SchoolProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const { currentUser, activeRole, createUser, allUsers } = useAuth();
+  const { currentUser, activeRole, createUser, allUsers, updateUser } = useAuth();
 
   const [settings, setSettings] = useState<SchoolSettings>(() => SchoolStorage.getSettings());
   const [students, setStudents] = useState<Student[]>(() => SchoolStorage.getStudents());
@@ -112,6 +130,8 @@ export const SchoolProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   const [attendanceSessions, setAttendanceSessions] = useState<AttendanceSession[]>(() => SchoolStorage.getAttendanceSessions());
   const [grades, setGrades] = useState<StudentGrade[]>(() => SchoolStorage.getGrades());
   const [violations, setViolations] = useState<ViolationRecord[]>(() => SchoolStorage.getViolations());
+  const [violationRules, setViolationRules] = useState<ViolationRule[]>(() => SchoolStorage.getViolationRules());
+  const [dailyScores, setDailyScores] = useState<DailyScoreRecord[]>(() => SchoolStorage.getDailyScores());
   const [counselingRecords, setCounselingRecords] = useState<CounselingRecord[]>(() => SchoolStorage.getCounselingRecords());
   const [attitudes, setAttitudes] = useState<AttitudeAssessment[]>(() => SchoolStorage.getAttitudes());
   const [notifications, setNotifications] = useState<SystemNotification[]>(() => SchoolStorage.getNotifications());
@@ -142,6 +162,8 @@ export const SchoolProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   useEffect(() => { SchoolStorage.saveAttendanceSessions(attendanceSessions); }, [attendanceSessions]);
   useEffect(() => { SchoolStorage.saveGrades(grades); }, [grades]);
   useEffect(() => { SchoolStorage.saveViolations(violations); }, [violations]);
+  useEffect(() => { SchoolStorage.saveViolationRules(violationRules); }, [violationRules]);
+  useEffect(() => { SchoolStorage.saveDailyScores(dailyScores); }, [dailyScores]);
   useEffect(() => { SchoolStorage.saveCounselingRecords(counselingRecords); }, [counselingRecords]);
   useEffect(() => { SchoolStorage.saveAttitudes(attitudes); }, [attitudes]);
   useEffect(() => { SchoolStorage.saveNotifications(notifications); }, [notifications]);
@@ -268,6 +290,21 @@ export const SchoolProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       });
     }
 
+    // Automatically sync wali kelas to class if assigned
+    if (newTeacher.classId) {
+      setClasses((prev) =>
+        prev.map((c) =>
+          c.classId.toUpperCase() === newTeacher.classId?.toUpperCase()
+            ? {
+                ...c,
+                homeroomTeacherName: newTeacher.name,
+                homeroomTeacherId: newTeacher.teacherCode || newTeacher.username,
+              }
+            : c
+        )
+      );
+    }
+
     logAction('Tambah Data Guru', 'Master', `Menambahkan guru baru ${newTeacher.name} (Kode: ${newTeacher.teacherCode})`);
     return newTeacher;
   };
@@ -276,6 +313,27 @@ export const SchoolProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     setTeachers((prev) =>
       prev.map((t) => (t.id === id ? { ...t, ...updates } : t))
     );
+
+    // Sync wali kelas if updated
+    if (updates.classId || updates.name) {
+      const current = teachers.find((t) => t.id === id);
+      const targetClass = updates.classId || current?.classId;
+      const targetName = updates.name || current?.name;
+      if (targetClass && targetName) {
+        setClasses((prev) =>
+          prev.map((c) =>
+            c.classId.toUpperCase() === targetClass.toUpperCase()
+              ? {
+                  ...c,
+                  homeroomTeacherName: targetName,
+                  homeroomTeacherId: updates.teacherCode || current?.teacherCode || current?.username,
+                }
+              : c
+          )
+        );
+      }
+    }
+
     logAction('Ubah Data Guru', 'Master', `Memperbarui data guru ID ${id}`);
   };
 
@@ -311,13 +369,22 @@ export const SchoolProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     teachers.forEach((t) => existingMap.set(t.username.toLowerCase(), t));
 
     const updatedList = [...teachers];
+    const homeroomUpdates = new Map<string, { name: string; teacherCode: string }>();
 
     newTeachers.forEach((row) => {
       const lowerUser = row.username.toLowerCase();
+      if (row.classId) {
+        homeroomUpdates.set(row.classId.toUpperCase(), {
+          name: row.name,
+          teacherCode: row.teacherCode || row.username,
+        });
+      }
+
       if (existingMap.has(lowerUser)) {
         // Multi-assignment merge:
         const t = existingMap.get(lowerUser)!;
         if (row.classId && !t.classId) t.classId = row.classId;
+        if (row.nip && !t.nip) t.nip = row.nip;
         if (row.role === 'wali_kelas') t.role = 'wali_kelas';
         merged++;
       } else {
@@ -325,6 +392,7 @@ export const SchoolProvider: React.FC<{ children: React.ReactNode }> = ({ childr
           id: `TCH${String(updatedList.length + 1).padStart(3, '0')}`,
           username: row.username,
           name: row.name,
+          nip: row.nip || undefined,
           role: row.role,
           classId: row.classId || undefined,
           teacherCode: row.teacherCode,
@@ -352,8 +420,115 @@ export const SchoolProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     });
 
     setTeachers(updatedList);
-    logAction('Import Guru Excel Massal', 'Import', `Import guru selesai: ${added} akun baru dibuat, ${merged} penugasan digabungkan.`);
+
+    // Sync wali kelas automatically into classes so it shows in data kelas
+    if (homeroomUpdates.size > 0) {
+      setClasses((prev) =>
+        prev.map((c) => {
+          const match = homeroomUpdates.get(c.classId.toUpperCase());
+          if (match) {
+            return {
+              ...c,
+              homeroomTeacherName: match.name,
+              homeroomTeacherId: match.teacherCode,
+            };
+          }
+          return c;
+        })
+      );
+    }
+
+    logAction('Import Guru Excel Massal', 'Import', `Import guru selesai: ${added} akun baru dibuat, ${merged} penugasan digabungkan, wali kelas disinkronkan ke rombel.`);
     return { added, merged };
+  };
+
+  const importWaliKelasBatch = (rows: WaliKelasImportRow[]) => {
+    let added = 0;
+    let updated = 0;
+
+    const classUpdates = new Map<string, { homeroomTeacherName: string; homeroomTeacherId: string; academicYear?: string }>();
+    const updatedTeachers = [...teachers];
+
+    rows.forEach((row) => {
+      const uname = row.username.trim().toLowerCase();
+      const targetClass = row.classId.trim().toUpperCase();
+      const academicYear = row.academicYear?.trim() || settings.activeAcademicYear;
+
+      // 1. Find teacher or user
+      const existingTeacher = updatedTeachers.find((t) => t.username.toLowerCase() === uname);
+      const existingUser = allUsers.find((u) => u.username.toLowerCase() === uname);
+
+      const teacherName = existingTeacher?.name || existingUser?.name || row.username;
+      const teacherCode = existingTeacher?.teacherCode || existingTeacher?.username || row.username;
+
+      // Record for updating class
+      classUpdates.set(targetClass, {
+        homeroomTeacherName: teacherName,
+        homeroomTeacherId: teacherCode,
+        academicYear,
+      });
+
+      // 2. Update Teacher record
+      if (existingTeacher) {
+        existingTeacher.classId = targetClass;
+        existingTeacher.role = 'wali_kelas';
+        updated++;
+      }
+
+      // 3. Update or Create User Account
+      if (existingUser) {
+        const roles = new Set(existingUser.availableRoles);
+        roles.add('guru_mapel');
+        roles.add('wali_kelas');
+        updateUser(existingUser.id, {
+          classId: targetClass,
+          role: 'wali_kelas',
+          availableRoles: Array.from(roles) as UserRole[],
+          ...(row.password ? { password: row.password } : {}),
+        });
+      } else {
+        // Create new account if didn't exist
+        createUser({
+          username: row.username,
+          name: teacherName,
+          role: 'wali_kelas',
+          availableRoles: ['guru_mapel', 'wali_kelas'],
+          classId: targetClass,
+          teacherCode: targetClass ? `W_${targetClass}` : undefined,
+          isActive: true,
+          email: `${row.username}@smpn1mantap.sch.id`,
+        });
+        added++;
+      }
+    });
+
+    setTeachers(updatedTeachers);
+
+    // 4. Update Classes homeroom teacher
+    if (classUpdates.size > 0) {
+      setClasses((prev) =>
+        prev.map((c) => {
+          const match = classUpdates.get(c.classId.toUpperCase());
+          if (match) {
+            return {
+              ...c,
+              homeroomTeacherName: match.homeroomTeacherName,
+              homeroomTeacherId: match.homeroomTeacherId,
+              academicYear: match.academicYear || c.academicYear,
+            };
+          }
+          return c;
+        })
+      );
+    }
+
+    logAction(
+      'Import Wali Kelas Excel Massal',
+      'Import',
+      `Berhasil mengimpor penugasan Wali Kelas: ${rows.length} rombel terhubung dengan akun guru & wali kelas.`
+    );
+
+    return { added, updated, total: rows.length };
   };
 
   // Class methods
@@ -379,6 +554,46 @@ export const SchoolProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     setClasses(fresh);
     SchoolStorage.saveClasses(fresh);
     logAction('Reset Kelas Default', 'Master', `Memulihkan kembali 24 rombel kelas standar 7A-9H.`);
+  };
+
+  const importClassesBatch = (newClasses: Partial<ClassRoom>[]) => {
+    let added = 0;
+    let updated = 0;
+    const existingMap = new Map<string, ClassRoom>();
+    classes.forEach((c) => existingMap.set(c.classId.toUpperCase(), c));
+
+    const updatedClasses = [...classes];
+
+    newClasses.forEach((row) => {
+      if (!row.classId) return;
+      const key = row.classId.toUpperCase();
+      if (existingMap.has(key)) {
+        const existing = existingMap.get(key)!;
+        if (row.gradeLevel) existing.gradeLevel = row.gradeLevel;
+        if (row.academicYear) existing.academicYear = row.academicYear;
+        updated++;
+      } else {
+        const gradeLevel = (row.gradeLevel || (['7', '8', '9'].includes(key.charAt(0)) ? key.charAt(0) : '7')) as '7' | '8' | '9';
+        const matchedTeacher = teachers.find((t) => t.classId?.toUpperCase() === key);
+        const newClass: ClassRoom = {
+          classId: key,
+          name: row.name || `Kelas ${key}`,
+          gradeLevel,
+          academicYear: row.academicYear || settings.activeAcademicYear,
+          studentCount: 0,
+          status: 'Aktif',
+          homeroomTeacherName: row.homeroomTeacherName || matchedTeacher?.name,
+          homeroomTeacherId: row.homeroomTeacherId || matchedTeacher?.teacherCode || matchedTeacher?.username,
+        };
+        updatedClasses.push(newClass);
+        existingMap.set(key, newClass);
+        added++;
+      }
+    });
+
+    setClasses(updatedClasses);
+    logAction('Import Kelas Excel Massal', 'Import', `Import kelas selesai: ${added} rombel baru, ${updated} rombel diperbarui.`);
+    return { added, updated };
   };
 
   // Subject methods
@@ -496,6 +711,29 @@ export const SchoolProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   const deleteSchedule = (id: string) => {
     setSchedules((prev) => prev.filter((s) => s.id !== id));
     logAction('Hapus Jadwal Pembelajaran', 'Master', `Menghapus jadwal ID ${id}`);
+  };
+
+  const deleteSchedulesByClass = (classId: string) => {
+    const targetClass = classId.toUpperCase();
+    const countBefore = schedules.length;
+    const remaining = schedules.filter((s) => s.classId.toUpperCase() !== targetClass);
+    const deletedCount = countBefore - remaining.length;
+    setSchedules(remaining);
+    logAction('Hapus Jadwal per Kelas', 'Master', `Menghapus seluruh jadwal (${deletedCount} sesi) untuk kelas ${classId}.`);
+    return deletedCount;
+  };
+
+  const deleteAllSchedules = () => {
+    const total = schedules.length;
+    setSchedules([]);
+    logAction('Hapus Seluruh Jadwal', 'Master', `Menghapus seluruh jadwal pembelajaran (${total} sesi).`);
+  };
+
+  const resetDefaultSchedules = () => {
+    const fresh = SchoolStorage.getFreshDefaultSchedules();
+    setSchedules(fresh);
+    SchoolStorage.saveSchedules(fresh);
+    logAction('Reset Jadwal Default', 'Master', `Memulihkan jadwal pembelajaran standar (${fresh.length} sesi).`);
   };
 
   const importSchedulesBatch = (newSchedules: any[]) => {
@@ -664,7 +902,32 @@ export const SchoolProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     logAction('Simpan Nilai Massal', 'Nilai', `Memperbarui nilai massal untuk ${gradesList.length} entri siswa.`);
   };
 
-  // Violations & Automatic BK Trigger (> 30 Points)
+  // Daily Scores per date tracking
+  const saveDailyScoreBatch = (newScores: DailyScoreRecord[]) => {
+    setDailyScores((prev) => {
+      const next = [...prev];
+      newScores.forEach((item) => {
+        const idx = next.findIndex(
+          (d) =>
+            d.studentId === item.studentId &&
+            d.subjectCode === item.subjectCode &&
+            d.date === item.date &&
+            d.assessmentType === item.assessmentType
+        );
+        if (idx >= 0) {
+          next[idx] = item;
+        } else {
+          next.push(item);
+        }
+      });
+      return next;
+    });
+  };
+
+  // Violations & Tiered Guidance/Notification Flow:
+  // - 15 points: Early guidance by Wali Kelas
+  // - 25 points: System notification to assigned Guru BK
+  // - > 30 points: Severe violation alert to Kepala Sekolah (and BK/Walas)
   const getStudentPoints = (studentId: string): number => {
     return violations
       .filter((v) => v.studentId === studentId)
@@ -672,10 +935,10 @@ export const SchoolProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   };
 
   const getStudentViolationCategory = (points: number) => {
-    if (points <= 10) return { label: 'Normal (0–10 Poin)', color: 'text-emerald-700 bg-emerald-50 border-emerald-200', badge: 'Normal' };
-    if (points <= 20) return { label: 'Perhatian (11–20 Poin)', color: 'text-amber-700 bg-amber-50 border-amber-200', badge: 'Perhatian' };
-    if (points <= 30) return { label: 'Peringatan (21–30 Poin)', color: 'text-orange-700 bg-orange-50 border-orange-200', badge: 'Peringatan' };
-    return { label: 'Pembinaan BK (> 30 Poin)', color: 'text-rose-700 bg-rose-50 border-rose-200 font-semibold', badge: 'Prioritas BK' };
+    if (points < 15) return { label: 'Normal (0–14 Poin)', color: 'text-emerald-700 bg-emerald-50 border-emerald-200', badge: 'Normal' };
+    if (points < 25) return { label: 'Bimbingan Wali Kelas (15–24 Poin)', color: 'text-amber-700 bg-amber-50 border-amber-200 font-medium', badge: 'Bimbingan Walas' };
+    if (points <= 30) return { label: 'Peringatan Guru BK (25–30 Poin)', color: 'text-orange-700 bg-orange-50 border-orange-200 font-semibold', badge: 'Perhatian BK' };
+    return { label: 'Pelanggaran Parah / Kasus Khusus (> 30 Poin)', color: 'text-rose-700 bg-rose-50 border-rose-200 font-bold', badge: 'Kasus Parah' };
   };
 
   const addViolation = (recordData: Omit<ViolationRecord, 'id'>) => {
@@ -695,24 +958,60 @@ export const SchoolProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       `Pelanggaran dicatat: ${recordData.studentName} (${recordData.points} poin) - Total akumulasi: ${newTotal} poin.`
     );
 
-    // Automatic BK Detection Trigger if > 30 points
-    if (newTotal > 30) {
-      // Check if alert notification already sent
-      const notifId = `NOTIF_BK_${recordData.studentId}`;
-      const existingNotif = notifications.find((n) => n.id === notifId);
-      if (!existingNotif) {
-        const bkAlert: SystemNotification = {
+    // Tier 1: Walas guidance alert (>= 15 points)
+    if (newTotal >= 15 && newTotal < 25) {
+      const notifId = `NOTIF_WALAS_${recordData.studentId}_15`;
+      if (!notifications.some((n) => n.id === notifId)) {
+        const walasNotif: SystemNotification = {
           id: notifId,
-          title: `Deteksi Otomatis BK: ${recordData.studentName}`,
-          message: `Siswa ${recordData.studentName} (Kelas ${recordData.classId}) mencapai ${newTotal} poin pelanggaran (>30 poin). Otomatis masuk ke daftar Prioritas Pembinaan BK.`,
+          title: `Bimbingan Awal Wali Kelas: ${recordData.studentName}`,
+          message: `Siswa ${recordData.studentName} (Kelas ${recordData.classId}) mencapai ${newTotal} poin pelanggaran (>= 15 poin). Mohon dilakukan pembimbingan tahap awal oleh Wali Kelas.`,
           type: 'alert',
-          targetRoles: ['guru_bk', 'wali_kelas', 'kepala_sekolah'],
+          targetRoles: ['wali_kelas'],
           targetClassId: recordData.classId,
           createdAt: new Date().toISOString(),
           read: false,
           actionLink: 'counseling',
         };
-        setNotifications((prev) => [bkAlert, ...prev]);
+        setNotifications((prev) => [walasNotif, ...prev]);
+      }
+    }
+
+    // Tier 2: Guru BK critical intervention alert (>= 25 points)
+    if (newTotal >= 25 && newTotal <= 30) {
+      const notifId = `NOTIF_BK_${recordData.studentId}_25`;
+      if (!notifications.some((n) => n.id === notifId)) {
+        const bkNotif: SystemNotification = {
+          id: notifId,
+          title: `Peringatan Kritis Guru BK: ${recordData.studentName}`,
+          message: `Siswa ${recordData.studentName} (Kelas ${recordData.classId}) mendekati ambang batas kritis dengan ${newTotal} poin pelanggaran (>= 25 poin). Diperlukan pendampingan dan pembinaan konseling Guru BK.`,
+          type: 'warning',
+          targetRoles: ['guru_bk', 'wali_kelas'],
+          targetClassId: recordData.classId,
+          createdAt: new Date().toISOString(),
+          read: false,
+          actionLink: 'counseling',
+        };
+        setNotifications((prev) => [bkNotif, ...prev]);
+      }
+    }
+
+    // Tier 3: Pelanggaran Parah (> 30 points) -> Automatic Kepsek notification!
+    if (newTotal > 30) {
+      const notifId = `NOTIF_KEPSEK_SEVERE_${recordData.studentId}`;
+      if (!notifications.some((n) => n.id === notifId)) {
+        const severeAlert: SystemNotification = {
+          id: notifId,
+          title: `Pelanggaran Parah (> 30 Poin): ${recordData.studentName}`,
+          message: `Siswa ${recordData.studentName} (Kelas ${recordData.classId}) mencapai ${newTotal} poin pelanggaran. Sistem mengirim laporan prioritas tinggi ke Kepala Sekolah untuk tindak lanjut koordinasi pimpinan.`,
+          type: 'alert',
+          targetRoles: ['kepala_sekolah', 'guru_bk', 'wali_kelas'],
+          targetClassId: recordData.classId,
+          createdAt: new Date().toISOString(),
+          read: false,
+          actionLink: 'counseling',
+        };
+        setNotifications((prev) => [severeAlert, ...prev]);
       }
     }
   };
@@ -723,19 +1022,93 @@ export const SchoolProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     logAction('Hapus Data Pelanggaran', 'Pelanggaran', `Menghapus pelanggaran ID ${id} (${target?.studentName})`);
   };
 
+  // Master Violation Rules (Kategori Poin Pelanggaran)
+  const addViolationRule = (rule: ViolationRule) => {
+    setViolationRules((prev) => [...prev, rule]);
+    logAction('Tambah Master Pelanggaran', 'Pelanggaran', `Menambahkan master aturan: ${rule.code} - ${rule.name} (${rule.points} poin)`);
+  };
+
+  const updateViolationRule = (id: string, updates: Partial<ViolationRule>) => {
+    setViolationRules((prev) => prev.map((r) => (r.id === id ? { ...r, ...updates } : r)));
+    logAction('Ubah Master Pelanggaran', 'Pelanggaran', `Memperbarui master aturan ID ${id}`);
+  };
+
+  const deleteViolationRule = (id: string) => {
+    const target = violationRules.find((r) => r.id === id);
+    setViolationRules((prev) => prev.filter((r) => r.id !== id));
+    logAction('Hapus Master Pelanggaran', 'Pelanggaran', `Menghapus master aturan ${target?.name || id}`);
+  };
+
+  const resetDefaultViolationRules = () => {
+    const fresh = SchoolStorage.getFreshDefaultViolationRules();
+    setViolationRules(fresh);
+    SchoolStorage.saveViolationRules(fresh);
+    logAction('Reset Master Pelanggaran', 'Pelanggaran', 'Memulihkan 10 master aturan pelanggaran standar.');
+  };
+
+  const importViolationRulesBatch = (rules: ViolationRule[]) => {
+    let added = 0;
+    const existingCodes = new Set(violationRules.map((r) => r.code.toUpperCase()));
+    const toAdd: ViolationRule[] = [];
+    rules.forEach((r) => {
+      if (!existingCodes.has(r.code.toUpperCase())) {
+        toAdd.push(r);
+        existingCodes.add(r.code.toUpperCase());
+        added++;
+      }
+    });
+    if (toAdd.length > 0) {
+      setViolationRules((prev) => [...prev, ...toAdd]);
+      logAction('Import Master Pelanggaran Excel', 'Import', `Berhasil menambahkan ${added} master aturan pelanggaran.`);
+    }
+    return { added };
+  };
+
   // Counseling BK records
+  // When counseling is completed ('Selesai'), automatic notification sent to Kepala Sekolah
   const addCounselingRecord = (recordData: Omit<CounselingRecord, 'id'>) => {
     const newId = `CSL${Date.now()}`;
     const newRecord: CounselingRecord = { ...recordData, id: newId };
     setCounselingRecords((prev) => [newRecord, ...prev]);
     logAction('Catat Pembinaan BK', 'BK', `Pencatatan pembinaan siswa ${recordData.studentName} status: ${recordData.status}`);
+
+    if (recordData.status === 'Selesai') {
+      const kepsekNotif: SystemNotification = {
+        id: `NOTIF_KEPSEK_RESOLVED_${Date.now()}`,
+        title: `Laporan Bimbingan Selesai: ${recordData.studentName}`,
+        message: `Pembinaan siswa ${recordData.studentName} (Kelas ${recordData.classId}) telah diselesaikan oleh ${recordData.counselorName}. Tindak lanjut: ${recordData.followUp || 'Pemantauan berkala'}.`,
+        type: 'info',
+        targetRoles: ['kepala_sekolah'],
+        targetClassId: recordData.classId,
+        createdAt: new Date().toISOString(),
+        read: false,
+        actionLink: 'counseling',
+      };
+      setNotifications((prev) => [kepsekNotif, ...prev]);
+    }
   };
 
   const updateCounselingRecord = (id: string, updates: Partial<CounselingRecord>) => {
+    const current = counselingRecords.find((c) => c.id === id);
     setCounselingRecords((prev) =>
       prev.map((c) => (c.id === id ? { ...c, ...updates } : c))
     );
     logAction('Perbarui Pembinaan BK', 'BK', `Memperbarui tindak lanjut konseling BK ID ${id}`);
+
+    if (updates.status === 'Selesai' && current) {
+      const kepsekNotif: SystemNotification = {
+        id: `NOTIF_KEPSEK_RESOLVED_${Date.now()}`,
+        title: `Laporan Bimbingan Selesai: ${current.studentName}`,
+        message: `Pembinaan siswa ${current.studentName} (Kelas ${current.classId}) telah diselesaikan oleh ${current.counselorName}. Tindak lanjut: ${updates.followUp || current.followUp || 'Selesai dan tertib'}.`,
+        type: 'info',
+        targetRoles: ['kepala_sekolah'],
+        targetClassId: current.classId,
+        createdAt: new Date().toISOString(),
+        read: false,
+        actionLink: 'counseling',
+      };
+      setNotifications((prev) => [kepsekNotif, ...prev]);
+    }
   };
 
   // Priority BK Students list (> 30 points)
@@ -814,6 +1187,7 @@ export const SchoolProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         deleteAllTeachers,
         resetDefaultTeachers,
         importTeachersBatch,
+        importWaliKelasBatch,
         classes: classes.map((c) => ({
           ...c,
           studentCount: students.filter((s) => s.classId === c.classId).length,
@@ -822,6 +1196,7 @@ export const SchoolProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         updateClass,
         deleteClass,
         resetDefaultClasses,
+        importClassesBatch,
         subjects,
         addSubject,
         updateSubject,
@@ -834,6 +1209,9 @@ export const SchoolProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         addSchedule,
         updateSchedule,
         deleteSchedule,
+        deleteSchedulesByClass,
+        deleteAllSchedules,
+        resetDefaultSchedules,
         checkScheduleConflict,
         importSchedulesBatch,
         attendanceSessions,
@@ -842,11 +1220,19 @@ export const SchoolProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         grades,
         saveStudentGrade,
         saveBatchGrades,
+        dailyScores,
+        saveDailyScoreBatch,
         violations,
         addViolation,
         deleteViolation,
         getStudentPoints,
         getStudentViolationCategory,
+        violationRules,
+        addViolationRule,
+        updateViolationRule,
+        deleteViolationRule,
+        resetDefaultViolationRules,
+        importViolationRulesBatch,
         counselingRecords,
         addCounselingRecord,
         updateCounselingRecord,

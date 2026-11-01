@@ -13,6 +13,9 @@ interface AuthContextType {
   createUser: (user: Omit<UserAccount, 'id'>) => void;
   deleteUser: (id: string) => void;
   resetPassword: (id: string) => string;
+  showPortalSelector: boolean;
+  setShowPortalSelector: (val: boolean) => void;
+  selectPortalRole: (role: 'guru_mapel' | 'wali_kelas') => void;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -41,6 +44,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
     return 'admin_operator';
   });
+
+  const [showPortalSelector, setShowPortalSelector] = useState<boolean>(false);
 
   useEffect(() => {
     try {
@@ -83,18 +88,44 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       lastLogin: new Date().toISOString(),
     };
 
+    const isDualTeacher =
+      updatedUser.availableRoles.includes('guru_mapel') &&
+      updatedUser.availableRoles.includes('wali_kelas');
+
     setCurrentUser(updatedUser);
-    setActiveRole(updatedUser.role);
     setAllUsers((prev) => prev.map((u) => (u.id === user.id ? updatedUser : u)));
     SchoolStorage.logActivity(updatedUser.name, updatedUser.role, 'Login Berhasil', 'Master', `Pengguna ${updatedUser.username} berhasil masuk ke aplikasi.`);
 
+    if (isDualTeacher) {
+      setShowPortalSelector(true);
+      setActiveRole(updatedUser.role || 'guru_mapel');
+    } else {
+      setShowPortalSelector(false);
+      setActiveRole(updatedUser.role);
+    }
+
     return { success: true };
+  };
+
+  const selectPortalRole = (role: 'guru_mapel' | 'wali_kelas') => {
+    setActiveRole(role);
+    setShowPortalSelector(false);
+    if (currentUser) {
+      SchoolStorage.logActivity(
+        currentUser.name,
+        role,
+        'Pilih Portal Masuk',
+        'Master',
+        `Memilih masuk sebagai ${role === 'guru_mapel' ? 'Guru Mata Pelajaran' : `Wali Kelas (${currentUser.classId || ''})`}.`
+      );
+    }
   };
 
   const logout = () => {
     if (currentUser) {
       SchoolStorage.logActivity(currentUser.name, activeRole, 'Logout', 'Master', `Pengguna ${currentUser.username} keluar dari aplikasi.`);
     }
+    setShowPortalSelector(false);
     setCurrentUser(null);
   };
 
@@ -155,6 +186,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         createUser,
         deleteUser,
         resetPassword,
+        showPortalSelector,
+        setShowPortalSelector,
+        selectPortalRole,
       }}
     >
       {children}

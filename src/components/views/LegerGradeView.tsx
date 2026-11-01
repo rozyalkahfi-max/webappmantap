@@ -196,7 +196,7 @@ export const LegerGradeView: React.FC = () => {
 
                   {subjects.map((sub) => {
                     const score = row.subScores[sub.code];
-                    const isBelowKkm = score < sub.passingGrade;
+                    const isBelowKkm = score < (sub.passingGrade || 75);
                     return (
                       <td
                         key={sub.code}

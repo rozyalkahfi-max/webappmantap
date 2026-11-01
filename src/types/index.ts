@@ -50,13 +50,30 @@ export interface ClassRoom {
   status: 'Aktif' | 'Nonaktif';
 }
 
+export interface WaliKelasImportRow {
+  username: string;
+  password?: string;
+  classId: string;
+  academicYear?: string;
+}
+
 export interface Subject {
-  code: string; // Kode Mapel, e.g. "BIN", "MAT", "IPA"
-  name: string; // e.g. "Bahasa Indonesia"
-  group: 'Muatan Nasional' | 'Muatan Kewilayahan' | 'Muatan Lokal';
-  hoursPerWeek: number;
-  passingGrade: number; // KKM, e.g. 75
+  code: string; // Id Mapel / Kode Mapel, e.g. "BIN", "MAT", "IPA"
+  name: string; // Nama Mata Pelajaran
+  group?: 'Muatan Nasional' | 'Muatan Kewilayahan' | 'Muatan Lokal' | string;
+  hoursPerWeek: number; // Jam Mapel Per Minggu
+  weeklyHours?: number; // Alias for hoursPerWeek
+  passingGrade?: number; // KKM (opsional)
   status: 'Aktif' | 'Nonaktif';
+}
+
+export interface ViolationRule {
+  id: string;
+  code: string; // Kode Pelanggaran
+  category: 'Ringan' | 'Sedang' | 'Berat';
+  name: string; // Nama Pelanggaran
+  points: number; // Poin Pelanggaran
+  description: string; // Keterangan
 }
 
 export interface ScheduleItem {
@@ -104,6 +121,20 @@ export interface AttendanceSession {
   submittedAt: string;
   records: Record<string, AttendanceStatus>; // studentId -> status
   notes?: string;
+  studentNotes?: Record<string, string>; // studentId -> specific note e.g. 'Membolos jam ke-2'
+}
+
+export interface DailyScoreRecord {
+  id: string;
+  date: string;
+  studentId: string;
+  studentName?: string;
+  classId: string;
+  subjectCode: string;
+  assessmentType: 'Tugas' | 'Kuis' | 'Praktik' | 'Proyek' | 'PH' | 'PTS' | 'PAS' | 'tugas' | 'kuis' | 'praktik' | 'proyek' | 'ph' | 'pts' | 'pas' | string;
+  topic?: string;
+  title?: string;
+  score: number;
 }
 
 export interface GradeComponent {
@@ -135,6 +166,7 @@ export interface StudentGrade {
   finalScore: number;
   letterGrade: 'A' | 'B' | 'C' | 'D';
   status: 'Tuntas' | 'Belum Tuntas';
+  date?: string;
 }
 
 export interface AttitudeAssessment {
@@ -163,12 +195,16 @@ export interface ViolationRecord {
   studentName: string;
   classId: string;
   date: string;
-  category: 'Kedisiplinan' | 'Ketertiban' | 'Kerapian' | 'Sikap & Etika' | 'Berat';
+  category: 'Ringan' | 'Sedang' | 'Berat' | 'Kedisiplinan' | 'Ketertiban' | 'Kerapian' | 'Sikap & Etika';
   violationType: string;
+  violationName?: string;
   description: string;
   points: number;
   reporterCode: string;
   reporterName: string;
+  reportedBy?: string;
+  status?: string;
+  followUp?: string;
   notes?: string;
 }
 
@@ -190,6 +226,7 @@ export interface CounselingRecord {
   progressNotes: string;
   status: CounselingStatus;
   confidential: boolean; // default true (hanya BK & Kepsek)
+  followUp?: string;
 }
 
 export interface SchoolSettings {

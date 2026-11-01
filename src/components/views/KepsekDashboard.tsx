@@ -133,7 +133,7 @@ export const KepsekDashboard: React.FC<{ onNavigate: (menuId: string) => void }>
         <StatCard title="Total Siswa" value={totalStudents} subtitle="24 Rombel" icon={GraduationCap} accentColor="blue" />
         <StatCard title="Total Guru" value={totalTeachers} subtitle="Tenaga Pendidik" icon={Users} accentColor="purple" />
         <StatCard title="Total Kelas" value={`${totalClasses} Kls`} subtitle="7A s/d 9H" icon={DoorClosed} accentColor="emerald" />
-        <StatCard title="Mata Pelajaran" value={totalSubjects} subtitle="Kurikulum SMP" icon={BookOpen} accentColor="amber" />
+        <StatCard title="Mata Pelajaran" value={totalSubjects} subtitle="Kurikulum Merdeka" icon={BookOpen} accentColor="blue" />
         <StatCard title="Jadwal Sesi" value={totalSchedules} subtitle="Sesi Mingguan" icon={CalendarDays} accentColor="blue" />
         <StatCard title="Kehadiran Siswa" value={`${studentAttendanceRate}%`} subtitle={`${totalHadir || 680} Hadir`} icon={CheckCircle2} accentColor="emerald" />
         <StatCard title="Kehadiran Guru" value={`${teacherAttendanceRate}%`} subtitle="Tatap Muka" icon={Activity} accentColor="blue" />

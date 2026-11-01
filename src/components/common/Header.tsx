@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Bell,
   User,
@@ -10,6 +10,8 @@ import {
   Menu,
   ShieldCheck,
   CheckCircle2,
+  Clock,
+  Calendar,
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { useSchool } from '../../context/SchoolContext';
@@ -27,13 +29,51 @@ export const Header: React.FC<HeaderProps> = ({
   onToggleSidebar,
   onNavigateToMenu,
 }) => {
-  const { currentUser, activeRole, switchRole, logout, allUsers, login } = useAuth();
+  const { currentUser, activeRole, switchRole, logout, allUsers, login, setShowPortalSelector } = useAuth();
   const { settings, notifications, unreadNotificationCount, markNotificationRead } = useSchool();
+
+  // Live ticking clock based on network/system timezone
+  const [currentTime, setCurrentTime] = useState<Date>(new Date());
+
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setCurrentTime(new Date());
+    }, 1000);
+    return () => clearInterval(timer);
+  }, []);
 
   const [showRoleMenu, setShowRoleMenu] = useState(false);
   const [showUserMenu, setShowUserMenu] = useState(false);
   const [showNotifMenu, setShowNotifMenu] = useState(false);
   const [showDemoSwitcher, setShowDemoSwitcher] = useState(false);
+
+  // Live clock formatted strings
+  const dayName = currentTime.toLocaleDateString('id-ID', { weekday: 'long' });
+  const dateFormatted = currentTime.toLocaleDateString('id-ID', {
+    day: 'numeric',
+    month: 'long',
+    year: 'numeric',
+  });
+  const timeFormatted = currentTime.toLocaleTimeString('id-ID', {
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+    hour12: false,
+  });
+
+  const timeZoneName = Intl.DateTimeFormat().resolvedOptions().timeZone || '';
+  let tzLabel = 'WIB';
+  const offsetMin = -currentTime.getTimezoneOffset();
+  const offsetHr = offsetMin / 60;
+  if (timeZoneName.includes('Jayapura') || offsetHr === 9) {
+    tzLabel = 'WIT';
+  } else if (timeZoneName.includes('Makassar') || timeZoneName.includes('Bali') || offsetHr === 8) {
+    tzLabel = 'WITA';
+  } else if (timeZoneName.includes('Jakarta') || timeZoneName.includes('Pontianak') || offsetHr === 7) {
+    tzLabel = 'WIB';
+  } else {
+    tzLabel = `GMT${offsetHr >= 0 ? '+' : ''}${offsetHr}`;
+  }
 
   const roleLabels: Record<UserRole, string> = {
     admin_operator: 'Admin Operator',
@@ -57,7 +97,7 @@ export const Header: React.FC<HeaderProps> = ({
   };
 
   return (
-    <header className="bg-white border-b border-slate-200 sticky top-0 z-30 px-4 sm:px-6 py-2.5 flex items-center justify-between gap-4 shadow-2xs no-print">
+    <header className="bg-white border-b border-slate-200 sticky top-0 z-30 px-3 sm:px-6 py-2 flex items-center justify-between gap-3 shadow-2xs no-print">
       {/* Zone 1: Brand & Sidebar Toggle */}
       <div className="flex items-center gap-3 shrink-0">
         <button
@@ -69,7 +109,7 @@ export const Header: React.FC<HeaderProps> = ({
         </button>
 
         <div className="flex items-center gap-2">
-          <div className="w-8 h-8 rounded-lg bg-blue-900 flex items-center justify-center text-white font-bold text-sm tracking-wider">
+          <div className="w-8 h-8 rounded-lg bg-blue-900 flex items-center justify-center text-white font-bold text-sm tracking-wider shadow-xs">
             SMP
           </div>
           <div className="hidden sm:block">
@@ -82,18 +122,44 @@ export const Header: React.FC<HeaderProps> = ({
           </div>
         </div>
 
-        <div className="hidden md:flex items-center text-xs text-slate-400 pl-4 border-l border-slate-200">
+        <div className="hidden lg:flex items-center text-xs text-slate-400 pl-3 border-l border-slate-200">
           <span className="font-semibold text-slate-700">{currentMenuTitle}</span>
         </div>
       </div>
 
-      {/* Zone 2: Academic Period Indicator */}
-      <div className="hidden xl:flex items-center gap-2 text-xs text-slate-600 font-medium bg-slate-50 border border-slate-200 px-3 py-1 rounded-md">
-        <span className="text-slate-400">Tahun:</span>
-        <span className="font-mono font-semibold text-slate-900">{settings.activeAcademicYear}</span>
-        <span className="text-slate-300">·</span>
-        <span className="text-slate-400">Semester:</span>
-        <span className="font-semibold text-blue-700">{settings.activeSemester}</span>
+      {/* Zone 2: Live Time & Date Display (Styled Sederhana Namun Menarik) */}
+      <div className="flex items-center gap-2.5">
+        <div className="flex items-center gap-2 bg-gradient-to-r from-slate-50 via-blue-50/40 to-slate-50 border border-slate-200/90 rounded-lg px-2.5 sm:px-3 py-1 shadow-2xs">
+          <div className="flex items-center gap-1.5 text-slate-500">
+            <Clock className="w-3.5 h-3.5 text-blue-600 shrink-0" />
+            <span className="text-xs font-semibold text-slate-800 capitalize hidden md:inline">
+              {dayName},
+            </span>
+            <span className="text-xs text-slate-600 font-medium hidden sm:inline">
+              {dateFormatted}
+            </span>
+          </div>
+
+          <span className="text-slate-300 hidden sm:inline">|</span>
+
+          {/* Time & Timezone Badge */}
+          <div className="flex items-center gap-1.5">
+            <span className="font-mono text-xs sm:text-sm font-bold text-blue-900 tracking-wide">
+              {timeFormatted}
+            </span>
+            <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-blue-600 text-white shadow-2xs">
+              {tzLabel}
+            </span>
+          </div>
+        </div>
+
+        {/* Academic Period Indicator */}
+        <div className="hidden 2xl:flex items-center gap-1.5 text-[11px] text-slate-500 font-medium bg-slate-50 border border-slate-200 px-2.5 py-1 rounded-lg">
+          <span className="text-slate-400">TP:</span>
+          <span className="font-mono font-bold text-slate-800">{settings.activeAcademicYear}</span>
+          <span className="text-slate-300">·</span>
+          <span className="font-semibold text-blue-700">{settings.activeSemester}</span>
+        </div>
       </div>
 
       {/* Zone 3: Actions & Profile */}
@@ -297,16 +363,34 @@ export const Header: React.FC<HeaderProps> = ({
               </div>
 
               <div className="py-1">
-                <button
-                  onClick={() => {
-                    onNavigateToMenu('settings');
-                    setShowUserMenu(false);
-                  }}
-                  className="w-full text-left px-3 py-2 hover:bg-slate-50 rounded text-slate-700 flex items-center gap-2"
-                >
-                  <School className="w-4 h-4 text-slate-400" />
-                  <span>Identitas & Pengaturan</span>
-                </button>
+                {/* Ganti Portal Akses (Khusus Guru Multi-Role) */}
+                {currentUser?.availableRoles?.includes('guru_mapel') && currentUser?.availableRoles?.includes('wali_kelas') && (
+                  <button
+                    onClick={() => {
+                      setShowPortalSelector(true);
+                      setShowUserMenu(false);
+                    }}
+                    className="w-full text-left px-3 py-2 hover:bg-indigo-50 rounded text-indigo-700 font-semibold flex items-center gap-2"
+                  >
+                    <Layers className="w-4 h-4 text-indigo-600" />
+                    <span>Pilih / Ganti Portal Masuk</span>
+                  </button>
+                )}
+
+                {/* Identitas & Pengaturan - Strictly Admin Operator Only */}
+                {activeRole === 'admin_operator' && (
+                  <button
+                    onClick={() => {
+                      onNavigateToMenu('settings');
+                      setShowUserMenu(false);
+                    }}
+                    className="w-full text-left px-3 py-2 hover:bg-slate-50 rounded text-slate-700 flex items-center gap-2"
+                  >
+                    <School className="w-4 h-4 text-slate-400" />
+                    <span>Identitas & Pengaturan</span>
+                  </button>
+                )}
+
                 <button
                   onClick={() => {
                     onNavigateToMenu('activity');

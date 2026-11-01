@@ -33,9 +33,9 @@ export const AdminDashboard: React.FC<{ onNavigate: (menuId: string) => void }> 
   const grade9Count = students.filter((s) => s.classId.startsWith('9')).length;
 
   const barData = [
-    { label: 'Tingkat 7 (7A–7H)', value: grade7Count, color: '#2563eb' },
-    { label: 'Tingkat 8 (8A–8H)', value: grade8Count, color: '#3b82f6' },
-    { label: 'Tingkat 9 (9A–9H)', value: grade9Count, color: '#60a5fa' },
+    { label: 'Tingkat 7 (7A–7H)', value: grade7Count, color: '#1d4ed8' },
+    { label: 'Tingkat 8 (8A–8H)', value: grade8Count, color: '#2563eb' },
+    { label: 'Tingkat 9 (9A–9H)', value: grade9Count, color: '#3b82f6' },
   ];
 
   const roleDonut = [
@@ -98,9 +98,9 @@ export const AdminDashboard: React.FC<{ onNavigate: (menuId: string) => void }> 
         <StatCard
           title="Mata Pelajaran"
           value={totalSubjects}
-          subtitle="Kurikulum Terpadu"
+          subtitle="Kurikulum Merdeka"
           icon={BookOpen}
-          accentColor="amber"
+          accentColor="blue"
         />
         <StatCard
           title="Jadwal Sesi"

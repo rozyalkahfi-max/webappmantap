@@ -17,10 +17,10 @@ import { AttendanceStatus } from '../../types';
 import { exportToExcel } from '../../utils/excel';
 
 export const AttendanceView: React.FC = () => {
-  const { schedules, students, classes, attendanceSessions, saveAttendanceSession } = useSchool();
+  const { schedules, students, classes, attendanceSessions, saveAttendanceSession, addViolation } = useSchool();
   const { currentUser, activeRole } = useAuth();
 
-  const today = '2026-10-31';
+  const today = new Date().toISOString().split('T')[0];
   const [selectedDate, setSelectedDate] = useState<string>(today);
 
   // Filter schedules available for dropdown
@@ -50,6 +50,7 @@ export const AttendanceView: React.FC = () => {
   const [topic, setTopic] = useState('Pendalaman Materi dan Diskusi Kelompok');
   const [notes, setNotes] = useState('');
   const [saveSuccess, setSaveSuccess] = useState(false);
+  const [truantAlerts, setTruantAlerts] = useState<string[]>([]);
 
   // Relevant schedule
   const currentSchedule = schedules.find((s) => s.id === selectedScheduleId);
@@ -64,27 +65,41 @@ export const AttendanceView: React.FC = () => {
 
   // Attendance state for students
   const [records, setRecords] = useState<Record<string, AttendanceStatus>>({});
+  // Per-student notes state (including membolos notes)
+  const [studentNotes, setStudentNotes] = useState<Record<string, string>>({});
 
   // Sync with existing session or initialize all as Hadir
   React.useEffect(() => {
     if (existingSession) {
       setRecords(existingSession.records);
+      setStudentNotes(existingSession.studentNotes || {});
       setTopic(existingSession.topic);
       setNotes(existingSession.notes || '');
     } else {
-      const initial: Record<string, AttendanceStatus> = {};
+      const initialRecords: Record<string, AttendanceStatus> = {};
+      const initialNotes: Record<string, string> = {};
       classStudents.forEach((st) => {
-        initial[st.id] = 'Hadir';
+        initialRecords[st.id] = 'Hadir';
+        initialNotes[st.id] = '';
       });
-      setRecords(initial);
+      setRecords(initialRecords);
+      setStudentNotes(initialNotes);
     }
     setSaveSuccess(false);
+    setTruantAlerts([]);
   }, [selectedScheduleId, selectedDate, existingSession]);
 
   const handleStatusChange = (studentId: string, status: AttendanceStatus) => {
     setRecords((prev) => ({
       ...prev,
       [studentId]: status,
+    }));
+  };
+
+  const handleStudentNoteChange = (studentId: string, text: string) => {
+    setStudentNotes((prev) => ({
+      ...prev,
+      [studentId]: text,
     }));
   };
 
@@ -100,6 +115,7 @@ export const AttendanceView: React.FC = () => {
     e.preventDefault();
     if (!currentSchedule) return;
 
+    // 1. Save attendance session including studentNotes
     saveAttendanceSession({
       scheduleId: currentSchedule.id,
       date: selectedDate,
@@ -111,11 +127,39 @@ export const AttendanceView: React.FC = () => {
       period: currentSchedule.period,
       topic,
       records,
+      studentNotes,
       notes,
     });
 
+    // 2. Auto-sync truant violations (+15 points) if teacher enters "membolos" or "bolos"
+    const detectedTruants: string[] = [];
+    classStudents.forEach((st) => {
+      const note = (studentNotes[st.id] || '').trim();
+      if (/membolos|bolos/i.test(note)) {
+        detectedTruants.push(st.name);
+        addViolation({
+          studentId: st.id,
+          studentName: st.name,
+          classId: currentSchedule.classId,
+          date: selectedDate,
+          category: 'Sedang',
+          violationType: 'Ketidakhadiran / Disiplin KBM',
+          violationName: `Meninggalkan kelas saat KBM (Membolos Jam Pelajaran - ${currentSchedule.subjectName})`,
+          description: `Siswa membolos pada jam pelajaran ${currentSchedule.subjectName}. Catatan guru: "${note}".`,
+          points: 15,
+          reporterCode: currentSchedule.teacherCode,
+          reporterName: `${currentSchedule.teacherName} (Guru Mapel)`,
+          reportedBy: `${currentSchedule.teacherName} (Guru Mapel)`,
+          status: 'Terverifikasi',
+          followUp: `Keterangan Absensi: "${note}". Poin otomatis tersinkron dari modul absensi KBM.`,
+          notes: `Keterangan Absensi: "${note}". Poin otomatis tersinkron dari modul absensi KBM.`,
+        });
+      }
+    });
+
+    setTruantAlerts(detectedTruants);
     setSaveSuccess(true);
-    setTimeout(() => setSaveSuccess(false), 3000);
+    setTimeout(() => setSaveSuccess(false), 5000);
   };
 
   // Metrics
@@ -359,9 +403,17 @@ export const AttendanceView: React.FC = () => {
           </div>
 
           {saveSuccess && (
-            <div className="p-3 bg-emerald-50 border border-emerald-200 text-emerald-800 rounded-xl text-xs flex items-center gap-2">
-              <CheckCircle2 className="w-4 h-4 text-emerald-600" />
-              <span>Data presensi kelas berhasil disimpan ke dalam jurnal pembelajaran.</span>
+            <div className="p-3 bg-emerald-50 border border-emerald-200 text-emerald-800 rounded-xl text-xs space-y-1">
+              <div className="flex items-center gap-2 font-semibold">
+                <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+                <span>Data presensi sesi berhasil disimpan ke dalam jurnal pembelajaran.</span>
+              </div>
+              {truantAlerts.length > 0 && (
+                <div className="mt-1 pl-6 text-rose-800 font-medium">
+                  🚨 <strong>Sanksi Otomatis (+15 Poin):</strong> Tercatat sanksi membolos untuk siswa:{' '}
+                  <span className="font-bold underline">{truantAlerts.join(', ')}</span>. Data telah disinkronkan ke buku pelanggaran siswa, Wali Kelas, dan Guru BK.
+                </div>
+              )}
             </div>
           )}
 
@@ -372,7 +424,7 @@ export const AttendanceView: React.FC = () => {
                 Daftar Peserta Didik Kelas {currentSchedule?.classId} ({classStudents.length} Siswa)
               </span>
               <span className="text-[11px] text-slate-500 font-mono">
-                Pilih status kehadiran untuk setiap siswa
+                Pilih status kehadiran dan tulis keterangan jika ada siswa membolos jam pelajaran
               </span>
             </div>
 
@@ -380,32 +432,36 @@ export const AttendanceView: React.FC = () => {
               <table className="w-full text-left border-collapse text-xs">
                 <thead>
                   <tr className="bg-slate-50/80 border-b border-slate-200 text-slate-600 font-semibold text-[11px]">
-                    <th className="py-2.5 px-3 w-12 text-center">No</th>
-                    <th className="py-2.5 px-3 w-28">NIS</th>
-                    <th className="py-2.5 px-4">Nama Siswa</th>
-                    <th className="py-2.5 px-3 w-20 text-center">Gender</th>
-                    <th className="py-2.5 px-6 text-center">Status Kehadiran</th>
+                    <th className="py-2.5 px-3 w-10 text-center">No</th>
+                    <th className="py-2.5 px-3 w-24">NIS</th>
+                    <th className="py-2.5 px-3">Nama Siswa</th>
+                    <th className="py-2.5 px-2 w-16 text-center">Gender</th>
+                    <th className="py-2.5 px-4 text-center w-72">Status Presensi</th>
+                    <th className="py-2.5 px-4 min-w-[280px]">Keterangan Khusus / Catatan Jam Pelajaran</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
                   {classStudents.map((st, idx) => {
                     const currentStatus = records[st.id] || 'Hadir';
+                    const currentNote = studentNotes[st.id] || '';
+                    const isTruant = /membolos|bolos/i.test(currentNote);
+
                     return (
-                      <tr key={st.id} className="hover:bg-slate-50/80">
+                      <tr key={st.id} className={isTruant ? 'bg-rose-50/40 hover:bg-rose-50/70' : 'hover:bg-slate-50/80'}>
                         <td className="py-2 px-3 text-center font-mono text-slate-400">
                           {idx + 1}
                         </td>
                         <td className="py-2 px-3 font-mono font-medium text-slate-700">
                           {st.nis}
                         </td>
-                        <td className="py-2 px-4 font-semibold text-slate-900">
+                        <td className="py-2 px-3 font-semibold text-slate-900">
                           {st.name}
                         </td>
-                        <td className="py-2 px-3 text-center text-slate-500 font-mono">
+                        <td className="py-2 px-2 text-center text-slate-500 font-mono">
                           {st.gender}
                         </td>
-                        <td className="py-2 px-6">
-                          <div className="flex items-center justify-center gap-2">
+                        <td className="py-2 px-4">
+                          <div className="flex items-center justify-center gap-1.5">
                             {(['Hadir', 'Sakit', 'Izin', 'Alpa'] as AttendanceStatus[]).map((stt) => {
                               const isSelected = currentStatus === stt;
                               let activeClass = 'bg-slate-100 text-slate-600 hover:bg-slate-200';
@@ -421,12 +477,32 @@ export const AttendanceView: React.FC = () => {
                                   key={stt}
                                   type="button"
                                   onClick={() => handleStatusChange(st.id, stt)}
-                                  className={`px-3 py-1 rounded text-xs transition-colors cursor-pointer ${activeClass}`}
+                                  className={`px-2.5 py-1 rounded text-xs transition-colors cursor-pointer ${activeClass}`}
                                 >
-                                  {stt}
+                                  {stt === 'Hadir' ? 'Hadir (H)' : stt === 'Sakit' ? 'Sakit (S)' : stt === 'Izin' ? 'Izin (I)' : 'Alpa (A)'}
                                 </button>
                               );
                             })}
+                          </div>
+                        </td>
+                        <td className="py-2 px-4">
+                          <div className="space-y-1">
+                            <input
+                              type="text"
+                              value={currentNote}
+                              onChange={(e) => handleStudentNoteChange(st.id, e.target.value)}
+                              placeholder="Keterangan siswa (Ketik 'membolos' untuk sanksi poin otomatis)..."
+                              className={`w-full px-2.5 py-1 text-xs border rounded-lg focus:outline-none focus:ring-1 ${
+                                isTruant
+                                  ? 'border-rose-400 bg-rose-50/60 text-rose-900 focus:ring-rose-500 font-medium'
+                                  : 'border-slate-300 bg-white text-slate-900 focus:ring-blue-600'
+                              }`}
+                            />
+                            {isTruant && (
+                              <div className="flex items-center gap-1.5 text-[10px] font-bold text-rose-700 bg-rose-100/90 border border-rose-300 px-2 py-0.5 rounded shadow-2xs">
+                                <span>🚨 Sistem: Terdeteksi 'Membolos Jam Pelajaran' (+15 Poin Otomatis Saat Simpan)</span>
+                              </div>
+                            )}
                           </div>
                         </td>
                       </tr>

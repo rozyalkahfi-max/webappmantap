@@ -8,6 +8,8 @@ import {
   StudentGrade,
   AttitudeAssessment,
   ViolationRecord,
+  ViolationRule,
+  DailyScoreRecord,
   CounselingRecord,
   SchoolSettings,
   SystemNotification,
@@ -48,6 +50,18 @@ export const DEFAULT_SUBJECTS: Subject[] = [
   { code: 'INF', name: 'Informatika', group: 'Muatan Nasional', hoursPerWeek: 2, passingGrade: 75, status: 'Aktif' },
   { code: 'PRA', name: 'Prakarya', group: 'Muatan Kewilayahan', hoursPerWeek: 2, passingGrade: 75, status: 'Aktif' },
   { code: 'BDA', name: 'Bahasa Daerah', group: 'Muatan Lokal', hoursPerWeek: 2, passingGrade: 75, status: 'Aktif' },
+];
+
+export const DEFAULT_VIOLATION_RULES: ViolationRule[] = [
+  { id: 'VR001', code: 'PLG01', category: 'Ringan', name: 'Terlambat masuk sekolah > 15 menit', points: 5, description: 'Tiba di gerbang sekolah setelah bel masuk dibunyikan.' },
+  { id: 'VR002', code: 'PLG02', category: 'Ringan', name: 'Seragam tidak sesuai ketentuan atribut', points: 5, description: 'Tidak mengenakan atribut lengkap seperti dasi, sabuk, atau kaos kaki.' },
+  { id: 'VR003', code: 'PLG03', category: 'Ringan', name: 'Rambut panjang / tidak rapi (siswa putra)', points: 8, description: 'Panjang rambut melebihi kerah kemeja seragam sekolah.' },
+  { id: 'VR004', code: 'PLG04', category: 'Sedang', name: 'Meninggalkan kelas saat jam pelajaran (Membolos Jam Pelajaran)', points: 15, description: 'Keluar kelas tanpa izin guru pengampu saat KBM berlangsung.' },
+  { id: 'VR005', code: 'PLG05', category: 'Sedang', name: 'Membawa gawai tanpa izin saat ujian/KBM', points: 15, description: 'Mengaktifkan smartphone di dalam kelas saat jam belajar.' },
+  { id: 'VR006', code: 'PLG06', category: 'Sedang', name: 'Merusak fasilitas / sarana prasarana sekolah', points: 20, description: 'Melakukan vandalisme atau mencoret meja/kursi/dinding sekolah.' },
+  { id: 'VR007', code: 'PLG07', category: 'Berat', name: 'Terlibat perkelahian / pertengkaran fisik', points: 25, description: 'Terlibat kontak fisik yang mengganggu ketertiban umum sekolah.' },
+  { id: 'VR008', code: 'PLG08', category: 'Berat', name: 'Melakukan tindakan perundungan (Bullying)', points: 35, description: 'Tindakan intimidasi fisik atau psikis berulang terhadap peserta didik lain.' },
+  { id: 'VR009', code: 'PLG09', category: 'Berat', name: 'Membawa barang terlarang ke lingkungan sekolah', points: 50, description: 'Membawa benda berbahaya atau materi terlarang ke sekolah.' },
 ];
 
 // 24 Classes: 7A - 7H, 8A - 8H, 9A - 9H
@@ -802,6 +816,10 @@ export class SchoolStorage {
     this.saveSchedules(initial);
     return initial;
   }
+  static getFreshDefaultSchedules(): ScheduleItem[] {
+    const teachers = this.getTeachers();
+    return generateDefaultSchedule(teachers);
+  }
   static saveSchedules(schedules: ScheduleItem[]): void {
     this.setItem('schedules', schedules);
   }
@@ -845,6 +863,28 @@ export class SchoolStorage {
   }
   static saveViolations(violations: ViolationRecord[]): void {
     this.setItem('violations', violations);
+  }
+
+  // Violation Rules (Kategori Poin Pelanggaran)
+  static getViolationRules(): ViolationRule[] {
+    const existing = this.getItem<ViolationRule[] | null>('violation_rules', null);
+    if (existing && existing.length > 0) return existing;
+    this.saveViolationRules(DEFAULT_VIOLATION_RULES);
+    return DEFAULT_VIOLATION_RULES;
+  }
+  static saveViolationRules(rules: ViolationRule[]): void {
+    this.setItem('violation_rules', rules);
+  }
+  static getFreshDefaultViolationRules(): ViolationRule[] {
+    return [...DEFAULT_VIOLATION_RULES];
+  }
+
+  // Daily Score Records
+  static getDailyScores(): DailyScoreRecord[] {
+    return this.getItem<DailyScoreRecord[]>('daily_scores', []);
+  }
+  static saveDailyScores(records: DailyScoreRecord[]): void {
+    this.setItem('daily_scores', records);
   }
 
   // BK Counseling Records
