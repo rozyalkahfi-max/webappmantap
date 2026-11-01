@@ -159,29 +159,124 @@ export const LoginView: React.FC = () => {
           <div className="mt-8 pt-6 border-t border-slate-100">
             <div className="flex items-center gap-1.5 text-xs font-bold text-slate-700 mb-2.5">
               <Sparkles className="w-3.5 h-3.5 text-blue-600" />
-              <span>Login Cepat Pengujian (5 Role):</span>
+              <span>Login Cepat Pengujian:</span>
             </div>
-            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-              {[
-                { user: 'admin', role: 'Admin Operator', tag: 'Master Data' },
-                { user: 'kepsek', role: 'Kepala Sekolah', tag: 'Eksekutif' },
-                { user: 'guru.sitirahmawati', role: 'Guru & Wali 7A', tag: 'Multi-Role' },
-                { user: 'guru.budihermawan', role: 'Guru & Wali 7B', tag: 'Multi-Role' },
-                { user: 'guru.nurulfaizah', role: 'Guru Mapel IPA', tag: 'Guru Mapel' },
-                { user: 'guru.bambangbk', role: 'Guru BK', tag: 'Konselor' },
-              ].map((acc) => (
+
+            <div className="space-y-2">
+              <div className="grid grid-cols-2 gap-2">
+                {/* 1. Admin Operator */}
                 <button
-                  key={acc.user}
                   type="button"
-                  onClick={() => handleQuickLogin(acc.user)}
-                  className="p-2 border border-slate-200 hover:border-blue-500 hover:bg-blue-50/50 rounded-lg text-left transition-colors cursor-pointer group"
+                  onClick={() => handleQuickLogin('admin')}
+                  className="p-2.5 border border-purple-200 bg-purple-50/40 hover:bg-purple-100/70 hover:border-purple-400 rounded-xl text-left transition-all cursor-pointer group"
                 >
-                  <p className="text-[11px] font-bold text-slate-800 group-hover:text-blue-700 truncate">
-                    {acc.role}
-                  </p>
-                  <p className="text-[10px] text-slate-500 font-mono truncate">{acc.tag}</p>
+                  <div className="flex items-center justify-between">
+                    <span className="text-[11px] font-bold text-purple-950 group-hover:text-purple-700">
+                      1. Admin Operator
+                    </span>
+                    <span className="text-[9px] font-mono px-1.5 py-0.2 rounded bg-purple-200/80 text-purple-900 font-bold">
+                      Master & Import
+                    </span>
+                  </div>
+                  <p className="text-[10px] text-slate-500 mt-0.5">Kelola data master & import Excel</p>
                 </button>
-              ))}
+
+                {/* 2. Kepala Sekolah */}
+                <button
+                  type="button"
+                  onClick={() => handleQuickLogin('kepsek')}
+                  className="p-2.5 border border-emerald-200 bg-emerald-50/40 hover:bg-emerald-100/70 hover:border-emerald-400 rounded-xl text-left transition-all cursor-pointer group"
+                >
+                  <div className="flex items-center justify-between">
+                    <span className="text-[11px] font-bold text-emerald-950 group-hover:text-emerald-700">
+                      2. Kepala Sekolah
+                    </span>
+                    <span className="text-[9px] font-mono px-1.5 py-0.2 rounded bg-emerald-200/80 text-emerald-900 font-bold">
+                      Eksekutif
+                    </span>
+                  </div>
+                  <p className="text-[10px] text-slate-500 mt-0.5">Pemantau laporan realtime sekolah</p>
+                </button>
+              </div>
+
+              {/* 3. Guru Container with Dynamic Roles (Guru Mapel, Wali Kelas, BK) */}
+              <div className="p-3 border border-blue-200 bg-blue-50/40 rounded-xl space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-bold text-blue-950 flex items-center gap-1.5">
+                    <span>3. Guru</span>
+                    <span className="text-[10px] font-medium text-blue-700">
+                      (Pilihan Hak Akses: Guru Mapel, Wali Kelas, & Guru BK)
+                    </span>
+                  </span>
+                </div>
+                <p className="text-[10px] text-slate-600 leading-relaxed">
+                  Hak akses otomatis terdeteksi dari data master: merangkap 2 atau 3 jabatan menampilkan portal sesuai jabatannya.
+                </p>
+
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-1.5 pt-1">
+                  <button
+                    type="button"
+                    onClick={() => handleQuickLogin('guru.nurulfaizah')}
+                    className="p-2 bg-white border border-slate-200 hover:border-blue-500 hover:bg-blue-50/60 rounded-lg text-left transition-colors cursor-pointer group"
+                  >
+                    <p className="text-[11px] font-bold text-slate-800 group-hover:text-blue-700 truncate">
+                      Guru Mapel Murni
+                    </p>
+                    <p className="text-[9px] text-slate-500 font-mono truncate">1 Peran: Mapel IPA</p>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => handleQuickLogin('guru.sitirahmawati')}
+                    className="p-2 bg-white border border-slate-200 hover:border-indigo-500 hover:bg-indigo-50/60 rounded-lg text-left transition-colors cursor-pointer group"
+                  >
+                    <p className="text-[11px] font-bold text-slate-800 group-hover:text-indigo-700 truncate">
+                      Guru Mapel + Walas
+                    </p>
+                    <p className="text-[9px] text-indigo-600 font-mono truncate">2 Peran: Mapel & Wali 7A</p>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => handleQuickLogin('guru.bambangbk')}
+                    className="p-2 bg-white border border-slate-200 hover:border-rose-500 hover:bg-rose-50/60 rounded-lg text-left transition-colors cursor-pointer group"
+                  >
+                    <p className="text-[11px] font-bold text-slate-800 group-hover:text-rose-700 truncate">
+                      Guru BK (Konselor)
+                    </p>
+                    <p className="text-[9px] text-rose-600 font-mono truncate">1 Peran: Guru BK Murni</p>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => handleQuickLogin('guru.sitiaminahbk')}
+                    className="p-2 bg-white border border-slate-200 hover:border-amber-500 hover:bg-amber-50/60 rounded-lg text-left transition-colors cursor-pointer group"
+                  >
+                    <p className="text-[11px] font-bold text-slate-800 group-hover:text-amber-700 truncate">
+                      Guru BK & Mengajar
+                    </p>
+                    <p className="text-[9px] text-amber-600 font-mono truncate">2 Peran: BK + Mapel</p>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => handleQuickLogin('guru.multiperan')}
+                    className="p-2 bg-white border border-indigo-300 hover:border-indigo-600 hover:bg-indigo-50 rounded-lg text-left transition-colors cursor-pointer group col-span-2 sm:col-span-2"
+                  >
+                    <div className="flex items-center justify-between">
+                      <p className="text-[11px] font-bold text-indigo-900 group-hover:text-indigo-700 truncate">
+                        Guru Merangkap 3 Jabatan
+                      </p>
+                      <span className="text-[9px] bg-indigo-100 text-indigo-800 font-bold px-1.5 rounded">
+                        Lengkap
+                      </span>
+                    </div>
+                    <p className="text-[9px] text-slate-600 font-mono truncate">
+                      3 Peran Terdeteksi: Guru Mapel, Wali Kelas (9F), & Guru BK
+                    </p>
+                  </button>
+                </div>
+              </div>
             </div>
           </div>
         </div>

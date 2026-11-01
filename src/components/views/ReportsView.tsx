@@ -12,25 +12,34 @@ import {
   HeartHandshake,
 } from 'lucide-react';
 import { useSchool } from '../../context/SchoolContext';
+import { useAuth } from '../../context/AuthContext';
 import { exportToExcel } from '../../utils/excel';
 import { PrintReportModal } from '../common/PrintReportModal';
 
 export const ReportsView: React.FC = () => {
   const { students, teachers, classes, subjects, grades, violations, counselingRecords, settings } = useSchool();
+  const { activeRole } = useAuth();
+  const isGuruBk = activeRole === 'guru_bk';
 
-  const [selectedReportType, setSelectedReportType] = useState<string>('attendance');
+  // For Guru BK: STRICTLY only show violations and counseling reports as per rule B!
+  const reportTypes = isGuruBk
+    ? [
+        { id: 'violations', title: 'Rekapitulasi Pelanggaran Tata Tertib', icon: AlertTriangle, desc: 'Akumulasi poin kedisiplinan dan kategori pelanggaran peserta didik' },
+        { id: 'counseling', title: 'Laporan Bimbingan Konseling (BK)', icon: HeartHandshake, desc: 'Rekam jejak penanganan kasus pembinaan siswa >30 poin' },
+      ]
+    : [
+        { id: 'attendance', title: 'Rekapitulasi Kehadiran Siswa', icon: Users, desc: 'Daftar presensi, sakit, izin, dan alpa per kelas' },
+        { id: 'leger', title: 'Leger Nilai Hasil Belajar', icon: Award, desc: 'Rekapitulasi seluruh nilai mata pelajaran dan rata-rata' },
+        { id: 'violations', title: 'Rekapitulasi Pelanggaran Tata Tertib', icon: AlertTriangle, desc: 'Akumulasi poin kedisiplinan dan kategori pelanggaran' },
+        { id: 'counseling', title: 'Laporan Bimbingan Konseling (BK)', icon: HeartHandshake, desc: 'Rekam jejak penanganan kasus pembinaan siswa' },
+      ];
+
+  const [selectedReportType, setSelectedReportType] = useState<string>(() => isGuruBk ? 'violations' : 'attendance');
   const [selectedClass, setSelectedClass] = useState<string>('7A');
   const [isPrintModalOpen, setIsPrintModalOpen] = useState(false);
 
   const currentClassRoom = classes.find((c) => c.classId === selectedClass);
   const classStudents = students.filter((s) => s.classId === selectedClass);
-
-  const reportTypes = [
-    { id: 'attendance', title: 'Rekapitulasi Kehadiran Siswa', icon: Users, desc: 'Daftar presensi, sakit, izin, dan alpa per kelas' },
-    { id: 'leger', title: 'Leger Nilai Hasil Belajar', icon: Award, desc: 'Rekapitulasi seluruh nilai mata pelajaran dan rata-rata' },
-    { id: 'violations', title: 'Rekapitulasi Pelanggaran Tata Tertib', icon: AlertTriangle, desc: 'Akumulasi poin kedisiplinan dan kategori pelanggaran' },
-    { id: 'counseling', title: 'Laporan Bimbingan Konseling (BK)', icon: HeartHandshake, desc: 'Rekam jejak penanganan kasus pembinaan siswa' },
-  ];
 
   const handleExportExcel = () => {
     if (selectedReportType === 'attendance') {
@@ -48,8 +57,8 @@ export const ReportsView: React.FC = () => {
       }));
       exportToExcel(data, `Presensi_${selectedClass}`, `Laporan_Kehadiran_Kelas_${selectedClass}`);
     } else if (selectedReportType === 'violations') {
-      const classVio = violations.filter((v) => v.classId === selectedClass);
-      exportToExcel(classVio, `Pelanggaran_${selectedClass}`, `Laporan_Pelanggaran_Kelas_${selectedClass}`);
+      const classVio = isGuruBk ? violations : violations.filter((v) => v.classId === selectedClass);
+      exportToExcel(classVio, `Pelanggaran_${isGuruBk ? 'Sekolah' : selectedClass}`, `Laporan_Pelanggaran_${Date.now()}`);
     } else if (selectedReportType === 'counseling') {
       exportToExcel(counselingRecords, 'Laporan_BK', `Laporan_Pembinaan_BK_${Date.now()}`);
     } else {
@@ -71,10 +80,12 @@ export const ReportsView: React.FC = () => {
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
           <h2 className="text-xl font-bold text-slate-900 tracking-tight">
-            Pusat Laporan & Ekspor Dokumen Resmi
+            {isGuruBk ? 'Laporan Konseling BK & Kedisiplinan' : 'Pusat Laporan & Ekspor Dokumen Resmi'}
           </h2>
           <p className="text-xs text-slate-500 mt-0.5">
-            Penyusunan berkas evaluasi sekolah, leger nilai, presensi, dan rekam jejak bimbingan konseling
+            {isGuruBk
+              ? 'Rekapitulasi pelanggaran tata tertib peserta didik dan rekam jejak penanganan kasus bimbingan konseling'
+              : 'Penyusunan berkas evaluasi sekolah, leger nilai, presensi, dan rekam jejak bimbingan konseling'}
           </p>
         </div>
 

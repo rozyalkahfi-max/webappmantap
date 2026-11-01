@@ -1,9 +1,12 @@
 import React, { useState } from 'react';
 import { Activity, Clock, CheckCircle2, AlertCircle, Bell, Search, Filter } from 'lucide-react';
 import { useSchool } from '../../context/SchoolContext';
+import { useAuth } from '../../context/AuthContext';
 
 export const MonitoringView: React.FC = () => {
   const { schedules, attendanceSessions, teachers, classes } = useSchool();
+  const { activeRole, currentUser } = useAuth();
+  const isGuru = activeRole === 'guru_mapel';
 
   const today = '2026-10-31';
   const [filterStatus, setFilterStatus] = useState<string>('ALL');
@@ -13,7 +16,7 @@ export const MonitoringView: React.FC = () => {
   // Schedules today (Senin/Jumat)
   const todaysSchedules = schedules.filter((s) => s.day === 'Senin' || s.day === 'Jumat');
 
-  const rows = todaysSchedules.map((sch, idx) => {
+  const allRows = todaysSchedules.map((sch, idx) => {
     const ses = attendanceSessions.find((s) => s.scheduleId === sch.id && s.date === today);
     const isCompleted = !!ses;
     const isOngoing = idx === 1 || idx === 4;
@@ -31,7 +34,14 @@ export const MonitoringView: React.FC = () => {
     };
   });
 
-  const filteredRows = rows.filter((r) => {
+  // Per Requirement C:
+  // Role Guru ONLY sees "Sudah Absensi / Selesai" and "Sedang Berlangsung"
+  // Role Kepsek sees all 3: "Belum Absensi / Terlambat", "Sudah Absensi / Selesai", and "Sedang Berlangsung"
+  const visibleRows = isGuru
+    ? allRows.filter((r) => r.statusType === 'completed' || r.statusType === 'ongoing')
+    : allRows;
+
+  const filteredRows = visibleRows.filter((r) => {
     if (filterStatus !== 'ALL' && r.statusType !== filterStatus) return false;
     if (searchTerm) {
       const term = searchTerm.toLowerCase();
@@ -49,9 +59,9 @@ export const MonitoringView: React.FC = () => {
     alert(`Pengingat berhasil dikirimkan ke guru ${teacherName} (${teacherCode}) via sistem notifikasi internal.`);
   };
 
-  const completedCount = rows.filter((r) => r.statusType === 'completed').length;
-  const ongoingCount = rows.filter((r) => r.statusType === 'ongoing').length;
-  const lateCount = rows.filter((r) => r.statusType === 'late').length;
+  const completedCount = allRows.filter((r) => r.statusType === 'completed').length;
+  const ongoingCount = allRows.filter((r) => r.statusType === 'ongoing').length;
+  const lateCount = allRows.filter((r) => r.statusType === 'late').length;
 
   return (
     <div className="space-y-4">
@@ -59,10 +69,14 @@ export const MonitoringView: React.FC = () => {
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
           <h2 className="text-xl font-bold text-slate-900 tracking-tight">
-            Monitoring Pembelajaran & Presensi Kelas Hari Ini
+            {isGuru
+              ? 'Riwayat Pembelajaran & Sesi Kelas Hari Ini'
+              : 'Monitoring Pembelajaran & Presensi Kelas Hari Ini'}
           </h2>
           <p className="text-xs text-slate-500 mt-0.5">
-            Pengawasan eksekutif terhadap kehadiran guru, ketertiban absensi, dan administrasi jurnal KBM
+            {isGuru
+              ? 'Menampilkan sesi pembelajaran yang telah selesai diabsen dan yang sedang berlangsung'
+              : 'Pengawasan eksekutif terhadap kehadiran guru, ketertiban absensi, dan administrasi jurnal KBM'}
           </p>
         </div>
 
@@ -72,7 +86,7 @@ export const MonitoringView: React.FC = () => {
       </div>
 
       {/* Status Counters Strip */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+      <div className={`grid grid-cols-1 ${isGuru ? 'sm:grid-cols-2' : 'sm:grid-cols-3'} gap-3`}>
         <div
           onClick={() => setFilterStatus('completed')}
           className={`p-4 rounded-xl border transition-colors cursor-pointer ${
@@ -109,23 +123,26 @@ export const MonitoringView: React.FC = () => {
           <span className="text-[11px] text-amber-600">KBM aktif di ruang kelas</span>
         </div>
 
-        <div
-          onClick={() => setFilterStatus('late')}
-          className={`p-4 rounded-xl border transition-colors cursor-pointer ${
-            filterStatus === 'late'
-              ? 'bg-rose-50 border-rose-500 shadow-xs'
-              : 'bg-white border-slate-200 hover:border-rose-300'
-          }`}
-        >
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-bold text-rose-800">Belum Absensi / Terlambat</span>
-            <span className="w-2.5 h-2.5 rounded-full bg-rose-500" />
+        {/* Belum Absensi / Terlambat ONLY shown in Kepsek / Admin per Requirement C */}
+        {!isGuru && (
+          <div
+            onClick={() => setFilterStatus('late')}
+            className={`p-4 rounded-xl border transition-colors cursor-pointer ${
+              filterStatus === 'late'
+                ? 'bg-rose-50 border-rose-500 shadow-xs'
+                : 'bg-white border-slate-200 hover:border-rose-300'
+            }`}
+          >
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-bold text-rose-800">Belum Absensi / Terlambat</span>
+              <span className="w-2.5 h-2.5 rounded-full bg-rose-500" />
+            </div>
+            <p className="text-2xl font-bold font-mono text-rose-900 mt-1 tabular-nums">
+              {lateCount} Sesi
+            </p>
+            <span className="text-[11px] text-rose-600">Memerlukan pengawasan kepala sekolah</span>
           </div>
-          <p className="text-2xl font-bold font-mono text-rose-900 mt-1 tabular-nums">
-            {lateCount} Sesi
-          </p>
-          <span className="text-[11px] text-rose-600">Memerlukan teguran kepala sekolah</span>
-        </div>
+        )}
       </div>
 
       {/* Filter and Search Bar */}
@@ -150,7 +167,7 @@ export const MonitoringView: React.FC = () => {
                 : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
             }`}
           >
-            Tampilkan Semua ({rows.length})
+            Tampilkan Semua ({visibleRows.length})
           </button>
         </div>
       </div>

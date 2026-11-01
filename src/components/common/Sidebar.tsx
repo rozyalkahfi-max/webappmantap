@@ -103,23 +103,13 @@ export const Sidebar: React.FC<SidebarProps> = ({
             title: 'Monitoring Eksekutif',
             items: [
               { id: 'monitoring', label: 'Monitoring Kelas Hari Ini', icon: Activity },
-              { id: 'attendance_recap', label: 'Analisis Kehadiran Siswa', icon: CheckSquare },
               { id: 'academic_analytics', label: 'Analisis Hasil Belajar', icon: BarChart3 },
-              { id: 'violations_monitor', label: 'Monitoring Pelanggaran', icon: AlertTriangle },
-              {
-                id: 'counseling_monitor',
-                label: 'Monitoring Pembinaan BK',
-                icon: HeartHandshake,
-                badge: priorityBkStudents.length,
-                badgeColor: 'bg-rose-100 text-rose-800',
-              },
             ],
           },
           {
-            title: 'Laporan & Audit',
+            title: 'Laporan Realtime Masuk',
             items: [
-              { id: 'leger', label: 'Leger Nilai Sekolah', icon: FileSpreadsheet },
-              { id: 'reports', label: 'Pusat Laporan & Cetak', icon: FileText },
+              { id: 'realtime_reports', label: 'Laporan Realtime Guru & BK', icon: FileText },
               { id: 'activity', label: 'Riwayat Aktivitas Guru', icon: History },
             ],
           },
@@ -138,8 +128,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
             items: [
               { id: 'attendance', label: 'Absensi Siswa (Presensi)', icon: CheckSquare },
               { id: 'grading', label: 'Input Penilaian Siswa', icon: Award },
-              { id: 'grades_recap', label: 'Rekap Nilai Mapel', icon: BarChart3 },
-              { id: 'attitude', label: 'Penilaian Sikap', icon: Sparkles },
             ],
           },
           {
@@ -163,7 +151,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
             title: 'Evaluasi & Nilai',
             items: [
               { id: 'leger', label: 'Leger Nilai Terpadu', icon: FileSpreadsheet },
-              { id: 'attendance_recap', label: 'Rekap Kehadiran Kelas', icon: CheckSquare },
+              { id: 'wali_attendance', label: 'Rekap Kehadiran Kelas', icon: CheckSquare },
               { id: 'attitude', label: 'Perkembangan Sikap', icon: Sparkles },
             ],
           },
@@ -177,8 +165,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 badge: priorityBkStudents.filter((p) => p.student.classId === currentUser?.classId).length || undefined,
                 badgeColor: 'bg-rose-100 text-rose-800',
               },
-              { id: 'wali_notes', label: 'Catatan Siswa & Tindak Lanjut', icon: FileText },
-              { id: 'reports', label: 'Cetak Rapor & Laporan Kelas', icon: FileText },
+              { id: 'wali_class_reports', label: 'Cetak Laporan Kelas', icon: FileText },
             ],
           },
         ];

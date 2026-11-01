@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import { AlertTriangle, Plus, Trash2, ShieldAlert, HeartHandshake, X, Filter, BookOpen, CheckCircle2, Lock } from 'lucide-react';
+import { AlertTriangle, Plus, Trash2, ShieldAlert, HeartHandshake, X, Filter, BookOpen, CheckCircle2, Lock, GraduationCap } from 'lucide-react';
 import { useSchool } from '../../context/SchoolContext';
 import { useAuth } from '../../context/AuthContext';
 import { ViolationRecord } from '../../types';
@@ -12,6 +12,7 @@ export const ViolationView: React.FC = () => {
     violations,
     violationRules,
     addViolation,
+    updateViolation,
     deleteViolation,
     getStudentPoints,
     getStudentViolationCategory,
@@ -21,6 +22,10 @@ export const ViolationView: React.FC = () => {
   const [selectedClass, setSelectedClass] = useState<string>('ALL');
   const [selectedCategoryFilter, setSelectedCategoryFilter] = useState<string>('ALL');
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isWalasModalOpen, setIsWalasModalOpen] = useState(false);
+  const [selectedViolationForWalas, setSelectedViolationForWalas] = useState<ViolationRecord | null>(null);
+  const [walasApproach, setWalasApproach] = useState('Bimbingan Motivasi & Pengarahan Moral Pribadi');
+  const [walasGuidanceNotes, setWalasGuidanceNotes] = useState('');
 
   // RBAC Permission check per requirement 3:
   // "yang berhak melihat masukan tiap point yang diberikan guru mapel, dan wali kelas, hanya wali kelas dan guru BK yang bisa melihat"
@@ -112,6 +117,25 @@ export const ViolationView: React.FC = () => {
     });
 
     setIsModalOpen(false);
+  };
+
+  const handleOpenWalasGuidance = (v: ViolationRecord) => {
+    setSelectedViolationForWalas(v);
+    setWalasApproach('Bimbingan Motivasi & Pengarahan Moral Pribadi');
+    setWalasGuidanceNotes(v.followUp?.includes('dibina oleh Wali Kelas') ? v.followUp : '');
+    setIsWalasModalOpen(true);
+  };
+
+  const handleSaveWalasGuidance = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedViolationForWalas) return;
+
+    updateViolation(selectedViolationForWalas.id, {
+      followUp: `Telah dibina oleh Wali Kelas (${walasApproach}). Catatan: "${walasGuidanceNotes || 'Siswa menyadari kesalahan dan berkomitmen memperbaiki diri.'}".`,
+      notes: `${selectedViolationForWalas.notes ? selectedViolationForWalas.notes + ' | ' : ''}Binaan Walas (${new Date().toLocaleDateString('id-ID')}): ${walasGuidanceNotes || walasApproach}`,
+    });
+
+    setIsWalasModalOpen(false);
   };
 
   // Filter violations according to role permissions and filters
@@ -218,12 +242,69 @@ export const ViolationView: React.FC = () => {
       ),
     },
     {
-      key: 'actions',
-      header: 'Aksi',
+      key: 'followUp',
+      header: 'Alur Tindak Lanjut',
       sortable: false,
-      align: 'right',
-      width: '80px',
       render: (v) => {
+        const total = getStudentPoints(v.studentId);
+        const isEscalatedToBK = total >= 30;
+
+        return isEscalatedToBK ? (
+          <div>
+            <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded bg-rose-100 text-rose-800 border border-rose-300">
+              <ShieldAlert className="w-3 h-3 text-rose-600" />
+              <span>Ditindaklanjuti Guru BK</span>
+            </span>
+            <span className="text-[10px] text-rose-600 block mt-0.5 font-medium">
+              Akumulasi: {total} Poin (&gt;30)
+            </span>
+          </div>
+        ) : (
+          <div>
+            <span className="inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded bg-indigo-50 text-indigo-800 border border-indigo-200">
+              <span>Binaan Khusus Walas</span>
+            </span>
+            <span className="text-[10px] text-slate-500 block mt-0.5">
+              Akumulasi: {total} Poin (&lt;30)
+            </span>
+          </div>
+        );
+      },
+    },
+    {
+      key: 'actions',
+      header: isWaliKelas ? 'Aksi Pembimbingan Walas' : 'Aksi',
+      sortable: false,
+      align: isWaliKelas ? 'center' : 'right',
+      width: isWaliKelas ? '190px' : '80px',
+      render: (v) => {
+        if (isWaliKelas) {
+          const isGuided = v.followUp?.includes('dibina oleh Wali Kelas');
+          return (
+            <div className="flex items-center justify-center gap-1.5">
+              {isGuided ? (
+                <span className="inline-flex items-center gap-1 text-[10px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-300 px-2 py-0.5 rounded">
+                  <CheckCircle2 className="w-3 h-3 text-emerald-600" />
+                  <span>Sudah Dibina</span>
+                </span>
+              ) : (
+                <span className="inline-flex items-center gap-1 text-[10px] font-bold text-amber-700 bg-amber-50 border border-amber-300 px-2 py-0.5 rounded">
+                  <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse" />
+                  <span>Perlu Bimbingan</span>
+                </span>
+              )}
+              <button
+                onClick={() => handleOpenWalasGuidance(v)}
+                className="px-2.5 py-1 bg-indigo-600 hover:bg-indigo-700 text-white rounded text-[11px] font-semibold transition-colors cursor-pointer flex items-center gap-1"
+                title="Bimbing Siswa Ini Secara Khusus Walas"
+              >
+                <HeartHandshake className="w-3 h-3" />
+                <span>{isGuided ? 'Ubah' : 'Bimbing'}</span>
+              </button>
+            </div>
+          );
+        }
+
         // Only Admin, BK, or the reporter can delete
         const canDelete = isBkOrAdmin || v.reporterCode === currentUser?.teacherCode;
         if (!canDelete) return null;
@@ -244,6 +325,19 @@ export const ViolationView: React.FC = () => {
       },
     },
   ];
+
+  // Detect students with >30 up to 50+ points for red warning in Guru BK account
+  const bkAlertStudents = useMemo(() => {
+    const studentMap = new Map<string, { student: any; points: number }>();
+    violations.forEach((v) => {
+      const total = getStudentPoints(v.studentId);
+      if (total >= 30 && !studentMap.has(v.studentId)) {
+        const st = students.find((s) => s.id === v.studentId);
+        if (st) studentMap.set(v.studentId, { student: st, points: total });
+      }
+    });
+    return Array.from(studentMap.values());
+  }, [violations, students, getStudentPoints]);
 
   return (
     <div className="space-y-4">
@@ -275,8 +369,8 @@ export const ViolationView: React.FC = () => {
           </p>
         </div>
 
-        {/* Can Add: Guru Mapel, Walas, BK, Admin (Kepsek is monitoring only) */}
-        {!isKepsek && (
+        {/* Can Add: Guru Mapel, BK, Admin (Walas and Kepsek cannot add directly per SOP) */}
+        {!isKepsek && !isWaliKelas && (
           <button
             onClick={handleOpenAdd}
             className="flex items-center gap-1.5 px-3.5 py-2 bg-rose-600 hover:bg-rose-700 text-white rounded-lg text-xs font-semibold shadow-xs transition-colors cursor-pointer shrink-0"
@@ -286,6 +380,58 @@ export const ViolationView: React.FC = () => {
           </button>
         )}
       </div>
+
+      {/* AUTOMATIC RED WARNING BANNER FOR GURU BK (>30–50 Poin) - Requirement 8 */}
+      {activeRole === 'guru_bk' && bkAlertStudents.length > 0 && (
+        <div className="p-4 bg-gradient-to-r from-red-700 via-rose-600 to-red-800 text-white rounded-xl shadow-lg border-2 border-red-500 animate-in fade-in space-y-2.5">
+          <div className="flex items-start gap-3">
+            <div className="w-9 h-9 rounded-xl bg-white/20 flex items-center justify-center shrink-0">
+              <ShieldAlert className="w-5 h-5 text-white animate-pulse" />
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <span className="text-[10px] font-bold uppercase tracking-widest bg-white/20 text-white px-2 py-0.5 rounded">
+                  Peringatan Merah Otomatis Sistem BK
+                </span>
+                <span className="text-xs text-rose-200 font-mono">Ambang Batas: 30–50+ Poin</span>
+              </div>
+              <h3 className="font-bold text-sm tracking-tight text-white mt-0.5">
+                🚨 Siswa Mencapai Akumulasi Poin Di Atas 30–50: Tindak Lanjut Konseling Wajib
+              </h3>
+              <p className="text-xs text-rose-100 mt-1 leading-relaxed">
+                Sesuai SOP kedisiplinan terintegrasi, pelanggaran di bawah 30 poin dibina langsung oleh Wali Kelas. Siswa di bawah ini telah melampaui 30 poin dan dialihkan ke penanganan Guru BK untuk konseling individual, mediasi restorative, dan pemanggilan orang tua.
+              </p>
+            </div>
+          </div>
+
+          <div className="flex flex-wrap gap-2 pt-2 border-t border-rose-500/60">
+            {bkAlertStudents.map(({ student, points }) => (
+              <div
+                key={student.id}
+                className="bg-white text-slate-900 px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-2 shadow-xs"
+              >
+                <span className="font-bold">{student.name}</span>
+                <span className="font-mono text-[10px] bg-slate-100 px-1.5 py-0.5 rounded text-slate-600">
+                  Kelas {student.classId}
+                </span>
+                <span className="font-mono font-bold text-rose-700 bg-rose-50 px-2 py-0.5 rounded border border-rose-200">
+                  {points} Poin
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* WALAS GUIDANCE BANNER (< 30 Poin) - Requirement 8 */}
+      {isWaliKelas && (
+        <div className="p-3 bg-indigo-50 border border-indigo-200 rounded-xl text-xs text-indigo-900 flex items-start gap-2.5">
+          <GraduationCap className="w-4 h-4 text-indigo-700 shrink-0 mt-0.5" />
+          <div className="leading-relaxed">
+            <span className="font-bold">SOP Pembinaan Terintegrasi Wali Kelas:</span> Peserta didik dengan akumulasi poin di bawah 30 poin menjadi kewenangan utama dan tanggung jawab Wali Kelas untuk dibimbing dan ditindaklanjuti secara langsung. Apabila akumulasi poin siswa mencapai di atas 30 poin, sistem secara otomatis mengekskalasikan penanganan ke Guru BK.
+          </div>
+        </div>
+      )}
 
       {/* Filter Toolbar */}
       <div className="bg-white border border-slate-200 rounded-xl p-3 flex flex-wrap items-center justify-between gap-3 shadow-xs">
@@ -472,6 +618,107 @@ export const ViolationView: React.FC = () => {
                   className="px-4 py-1.5 bg-rose-600 hover:bg-rose-700 text-white rounded-lg font-semibold transition-colors shadow-2xs cursor-pointer"
                 >
                   Simpan Catatan Pelanggaran
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL PEMBIMBINGAN KHUSUS WALI KELAS */}
+      {isWalasModalOpen && selectedViolationForWalas && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-xs">
+          <div className="bg-white rounded-2xl shadow-xl max-w-lg w-full p-6 border border-slate-200 animate-in fade-in zoom-in-95">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-100 mb-4">
+              <div className="flex items-center gap-2 text-indigo-700">
+                <HeartHandshake className="w-5 h-5" />
+                <h3 className="font-bold text-base text-slate-900">
+                  Aksi Pembimbingan Khusus Wali Kelas
+                </h3>
+              </div>
+              <button
+                onClick={() => setIsWalasModalOpen(false)}
+                className="p-1 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <form onSubmit={handleSaveWalasGuidance} className="space-y-4 text-xs">
+              <div className="p-3 bg-indigo-50 border border-indigo-200 rounded-xl space-y-1">
+                <div className="flex items-center justify-between">
+                  <span className="font-bold text-indigo-950 text-sm">{selectedViolationForWalas.studentName}</span>
+                  <span className="font-mono text-indigo-700 bg-indigo-100 px-2 py-0.5 rounded text-[11px] font-bold">
+                    Kelas {selectedViolationForWalas.classId}
+                  </span>
+                </div>
+                <p className="text-indigo-800 text-[11px]">
+                  Bentuk Pelanggaran: <strong>{selectedViolationForWalas.violationType}</strong> (+{selectedViolationForWalas.points} Poin)
+                </p>
+                <p className="text-slate-600 text-[11px]">
+                  Dicatat oleh: {selectedViolationForWalas.reporterName} ({selectedViolationForWalas.date})
+                </p>
+              </div>
+
+              <div>
+                <label className="block font-semibold text-slate-700 mb-1">
+                  Bentuk Pendekatan & Pembinaan Wali Kelas
+                </label>
+                <select
+                  value={walasApproach}
+                  onChange={(e) => setWalasApproach(e.target.value)}
+                  className="w-full px-3 py-2 border border-slate-300 rounded-lg bg-white font-medium text-slate-900"
+                >
+                  <option value="Bimbingan Motivasi & Pengarahan Moral Pribadi">
+                    1. Bimbingan Motivasi & Pengarahan Moral Pribadi
+                  </option>
+                  <option value="Teguran Lisan & Pembinaan Sikap di Meja Walas">
+                    2. Teguran Lisan & Pembinaan Sikap di Meja Walas
+                  </option>
+                  <option value="Pembuatan Kesepakatan Belajar & Kontrak Perilaku">
+                    3. Pembuatan Kesepakatan Belajar & Kontrak Perilaku
+                  </option>
+                  <option value="Restorasi Disiplin & Penugasan Edukatif">
+                    4. Restorasi Disiplin & Penugasan Edukatif
+                  </option>
+                  <option value="Komunikasi Awal & Notifikasi ke Orang Tua">
+                    5. Komunikasi Awal & Notifikasi ke Orang Tua
+                  </option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block font-semibold text-slate-700 mb-1">
+                  Catatan Hasil Bimbingan & Komitmen Siswa
+                </label>
+                <textarea
+                  rows={3}
+                  value={walasGuidanceNotes}
+                  onChange={(e) => setWalasGuidanceNotes(e.target.value)}
+                  placeholder="Contoh: Siswa telah diajak berdialog empat mata, mengakui kekhilafan, dan berjanji masuk tepat waktu..."
+                  required
+                  className="w-full px-3 py-2 border border-slate-300 rounded-lg text-slate-900 focus:outline-none focus:ring-1 focus:ring-indigo-600"
+                />
+              </div>
+
+              <div className="p-2.5 bg-slate-50 border border-slate-200 rounded-lg text-[11px] text-slate-600">
+                <span>Catatan pembimbingan ini akan langsung tersimpan dan dapat dipantau oleh Guru BK serta Kepala Sekolah.</span>
+              </div>
+
+              <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-100">
+                <button
+                  type="button"
+                  onClick={() => setIsWalasModalOpen(false)}
+                  className="px-3 py-1.5 border border-slate-300 rounded-lg text-slate-600 hover:bg-slate-50 transition-colors cursor-pointer"
+                >
+                  Batal
+                </button>
+                <button
+                  type="submit"
+                  className="px-4 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg font-semibold transition-colors shadow-2xs cursor-pointer flex items-center gap-1.5"
+                >
+                  <CheckCircle2 className="w-4 h-4" />
+                  <span>Simpan Pembinaan Walas</span>
                 </button>
               </div>
             </form>

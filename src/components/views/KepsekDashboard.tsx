@@ -142,21 +142,71 @@ export const KepsekDashboard: React.FC<{ onNavigate: (menuId: string) => void }>
         <StatCard title="Siswa Izin" value={totalIzin || 8} subtitle="Surat Orang Tua" icon={Clock} accentColor="amber" />
         <StatCard title="Tanpa Keterangan" value={totalAlpa || 6} subtitle="Perlu Penelusuran" icon={AlertCircle} accentColor="rose" />
         <StatCard title="Rata-Rata Nilai" value={averageGrade} subtitle="KKM Sekolah: 75" icon={TrendingUp} accentColor="emerald" />
-        <StatCard title="Pelanggaran" value={totalViolationsCount} subtitle="Tercatat Sekolah" icon={AlertTriangle} accentColor="amber" />
+        <StatCard title="Laporan KBM Masuk" value={todaysSessions.length} subtitle="Sesi Terisi Guru" icon={CheckCircle2} accentColor="emerald" />
         <StatCard
-          title="Prioritas BK"
-          value={`${bkPriorityCount} Siswa`}
-          subtitle="Akumulasi > 30 Poin"
+          title="Kasus Prioritas BK"
+          value={`${bkPriorityCount} Kasus`}
+          subtitle="Ditangani Guru BK"
           icon={HeartHandshake}
           accentColor="rose"
         />
         <div
-          onClick={() => onNavigate('counseling_monitor')}
-          className="bg-rose-50 border border-rose-200 rounded-xl p-4 flex flex-col justify-between hover:bg-rose-100/70 transition-colors cursor-pointer"
+          onClick={() => onNavigate('realtime_reports')}
+          className="bg-emerald-50 border border-emerald-200 rounded-xl p-4 flex flex-col justify-between hover:bg-emerald-100/70 transition-colors cursor-pointer"
         >
-          <span className="text-[10px] font-bold uppercase tracking-wider text-rose-800">Status Pembinaan BK</span>
-          <span className="text-xl font-bold font-mono text-rose-900 mt-1">{bkPriorityCount} Kasus</span>
-          <span className="text-[10px] text-rose-700 underline font-semibold mt-1">Buka Monitoring BK →</span>
+          <div className="flex items-center justify-between">
+            <span className="text-[10px] font-bold uppercase tracking-wider text-emerald-800">Laporan Realtime</span>
+            <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+          </div>
+          <span className="text-xl font-bold font-mono text-emerald-950 mt-1">Live Feed</span>
+          <span className="text-[10px] text-emerald-700 underline font-semibold mt-1">Pantau Laporan Masuk →</span>
+        </div>
+      </div>
+
+      {/* Laporan Realtime Masuk Terkini Preview Strip */}
+      <div className="bg-gradient-to-r from-slate-900 to-blue-950 rounded-xl p-5 text-white shadow-xs">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-3">
+          <div>
+            <h3 className="text-sm font-bold text-white flex items-center gap-2">
+              <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping" />
+              <span>Laporan Realtime Masuk dari Guru, Walas & Guru BK</span>
+            </h3>
+            <p className="text-xs text-slate-300 mt-0.5">
+              Kepala Sekolah menerima laporan administrasi KBM, pembinaan walas, dan penanganan BK secara langsung
+            </p>
+          </div>
+          <button
+            onClick={() => onNavigate('realtime_reports')}
+            className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-semibold shadow-xs transition-colors cursor-pointer shrink-0"
+          >
+            Buka Semua Laporan Realtime →
+          </button>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-3 text-xs pt-1">
+          <div className="bg-white/10 rounded-lg p-3 border border-white/10">
+            <span className="text-[10px] uppercase font-mono text-blue-300 font-bold block">1. Guru Mapel</span>
+            <p className="font-semibold text-white mt-1">Presensi KBM & Jurnal Terisi</p>
+            <p className="text-[11px] text-slate-300 mt-0.5 line-clamp-2">
+              {todaysSessions.length} sesi pembelajaran KBM hari ini telah disubmit guru mata pelajaran.
+            </p>
+          </div>
+
+          <div className="bg-white/10 rounded-lg p-3 border border-white/10">
+            <span className="text-[10px] uppercase font-mono text-indigo-300 font-bold block">2. Wali Kelas</span>
+            <p className="font-semibold text-white mt-1">Pembinaan Khusus Walas (&lt;30 Poin)</p>
+            <p className="text-[11px] text-slate-300 mt-0.5 line-clamp-2">
+              Bimbingan moral, pengawasan kehadiran, dan pembinaan kedisiplinan tingkat kelas binaan aktif.
+            </p>
+          </div>
+
+          <div className="bg-white/10 rounded-lg p-3 border border-white/10">
+            <span className="text-[10px] uppercase font-mono text-rose-300 font-bold block">3. Guru BK</span>
+            <p className="font-semibold text-white mt-1">Penanganan Kasus Prioritas (&gt;30 Poin)</p>
+            <p className="text-[11px] text-slate-300 mt-0.5 line-clamp-2">
+              {bkPriorityCount} siswa tereskalasi dalam penanganan konseling individual dan kontrak perilaku.
+            </p>
+          </div>
         </div>
       </div>
 

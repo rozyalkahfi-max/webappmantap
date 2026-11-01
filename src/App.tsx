@@ -26,6 +26,10 @@ import { ReportsView } from './components/views/ReportsView';
 import { UserManagementView } from './components/views/UserManagementView';
 import { SchoolSettingsView } from './components/views/SchoolSettingsView';
 import { ActivityLogView } from './components/views/ActivityLogView';
+import { KepsekRealtimeReportsView } from './components/views/KepsekRealtimeReportsView';
+import { AcademicAnalyticsView } from './components/views/AcademicAnalyticsView';
+import { WaliAttendanceView } from './components/views/WaliAttendanceView';
+import { WaliClassReportsView } from './components/views/WaliClassReportsView';
 import { PortalSelectionModal } from './components/common/PortalSelectionModal';
 import { MobileBottomNav } from './components/common/MobileBottomNav';
 
@@ -78,7 +82,8 @@ const MainLayout: React.FC = () => {
       guru_schedule: 'Jadwal Mengajar Saya',
       attendance: 'Absensi Siswa (Presensi Sesi)',
       attendance_recap: 'Rekapitulasi Kehadiran Siswa',
-      wali_attendance: 'Rekap Kehadiran Kelas',
+      wali_attendance: 'Rekap Kehadiran Siswa Kelas (Kiriman Guru Mapel)',
+      academic_analytics: 'Analisis Hasil Belajar & Capaian Akademik',
       grading: 'Input Penilaian Siswa',
       grades_recap: 'Rekap Nilai Mapel',
       leger: 'Leger Nilai Hasil Belajar Terpadu',
@@ -91,7 +96,9 @@ const MainLayout: React.FC = () => {
       bk_monitoring: 'Monitoring Perkembangan BK',
       attitude: 'Penilaian Sikap & Budi Pekerti',
       monitoring: 'Monitoring Kelas Hari Ini',
+      realtime_reports: 'Laporan Realtime Masuk (Guru, Walas & BK)',
       reports: 'Pusat Laporan & Ekspor Dokumen',
+      wali_class_reports: 'Cetak Laporan Kelas (Kehadiran & Nilai)',
       users: 'Manajemen Akun Pengguna',
       settings: 'Identitas Sekolah & Sistem',
       activity: 'Riwayat Aktivitas & Audit Trail',
@@ -123,8 +130,11 @@ const MainLayout: React.FC = () => {
       case 'subjects':
         return <SubjectMasterView />;
 
-      // Excel Mass Import
+      // Excel Mass Import - Strictly Admin Operator Only (Requirement 10)
       case 'import_excel':
+        if (activeRole !== 'admin_operator') {
+          return <AdminDashboard onNavigate={setCurrentMenu} />;
+        }
         return <ExcelImportView />;
 
       // Schedules
@@ -132,11 +142,20 @@ const MainLayout: React.FC = () => {
       case 'guru_schedule':
         return <ScheduleView onNavigate={setCurrentMenu} />;
 
+      // Academic Analytics for Kepsek (and others)
+      case 'academic_analytics':
+        return <AcademicAnalyticsView onNavigate={setCurrentMenu} />;
+
       // Attendance
       case 'attendance':
-      case 'attendance_recap':
-      case 'wali_attendance':
         return <AttendanceView />;
+      case 'attendance_recap':
+        if (activeRole === 'wali_kelas') {
+          return <WaliAttendanceView />;
+        }
+        return <AttendanceView />;
+      case 'wali_attendance':
+        return <WaliAttendanceView />;
 
       // Grading & Leger
       case 'grading':
@@ -166,13 +185,20 @@ const MainLayout: React.FC = () => {
       case 'monitoring':
       case 'journal':
         return <MonitoringView />;
+      case 'realtime_reports':
+        return <KepsekRealtimeReportsView />;
       case 'reports':
       case 'wali_reports':
       case 'wali_notes':
         return <ReportsView />;
+      case 'wali_class_reports':
+        return <WaliClassReportsView />;
 
-      // System Administration
+      // System Administration - Strictly Admin Operator Only (Requirement 10)
       case 'users':
+        if (activeRole !== 'admin_operator') {
+          return <AdminDashboard onNavigate={setCurrentMenu} />;
+        }
         return <UserManagementView />;
       case 'settings':
       case 'settings_academic':

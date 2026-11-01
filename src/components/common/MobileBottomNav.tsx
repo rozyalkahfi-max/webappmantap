@@ -13,6 +13,7 @@ import {
   ShieldAlert,
   HeartHandshake,
   Layers,
+  BarChart3,
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { UserRole } from '../../types';
@@ -30,9 +31,7 @@ export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({
 }) => {
   const { activeRole, currentUser, setShowPortalSelector } = useAuth();
 
-  const isDualTeacher =
-    currentUser?.availableRoles?.includes('guru_mapel') &&
-    currentUser?.availableRoles?.includes('wali_kelas');
+  const isMultiRoleTeacher = (currentUser?.availableRoles?.length ?? 0) > 1;
 
   interface NavItem {
     id: string;
@@ -66,8 +65,8 @@ export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({
         return [
           { id: 'kepsek_dash', label: 'Dashboard', icon: LayoutDashboard },
           { id: 'monitoring', label: 'Monitoring', icon: Activity },
-          { id: 'attendance_recap', label: 'Kehadiran', icon: CheckSquare },
-          { id: 'reports', label: 'Laporan', icon: FileText },
+          { id: 'academic_analytics', label: 'Hasil Belajar', icon: BarChart3 },
+          { id: 'realtime_reports', label: 'Laporan', icon: FileText },
           { id: 'sidebar', label: 'Menu', icon: Menu, isAction: true, action: onOpenSidebar },
         ];
 
@@ -101,15 +100,15 @@ export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({
 
   return (
     <div className="fixed bottom-0 left-0 right-0 z-30 bg-white/95 backdrop-blur-md border-t border-slate-200/90 shadow-lg lg:hidden px-2 py-1">
-      {/* If dual teacher, quick switch pill */}
-      {isDualTeacher && (
+      {/* If multi-role teacher, quick switch pill */}
+      {isMultiRoleTeacher && (
         <div className="flex justify-center -mt-4 mb-1">
           <button
             onClick={() => setShowPortalSelector(true)}
             className="flex items-center gap-1.5 px-3 py-1 bg-indigo-600 hover:bg-indigo-700 text-white rounded-full text-[10px] font-bold shadow-md cursor-pointer tracking-wide"
           >
             <Layers className="w-3 h-3 text-indigo-200" />
-            <span>Ganti Portal: {activeRole === 'guru_mapel' ? 'Ke Wali Kelas' : 'Ke Guru Mapel'}</span>
+            <span>Ganti Peran Guru ({currentUser?.availableRoles?.length} Akses)</span>
           </button>
         </div>
       )}

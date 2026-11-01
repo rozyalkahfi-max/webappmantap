@@ -1011,6 +1011,29 @@ export class SchoolStorage {
         isActive: true,
         email: 'guru.bambangbk@smpn1mantap.sch.id',
       },
+      {
+        id: 'USR007',
+        username: 'guru.sitiaminahbk',
+        name: 'Siti Aminah, S.Pd',
+        role: 'guru_bk',
+        availableRoles: ['guru_mapel', 'guru_bk'], // Multi-role: BK & Mengajar
+        teacherCode: 'G16',
+        subject: 'Bimbingan Konseling & Prakarya',
+        isActive: true,
+        email: 'guru.sitiaminahbk@smpn1mantap.sch.id',
+      },
+      {
+        id: 'USR008',
+        username: 'guru.multiperan',
+        name: 'Dra. Retno Palupi, M.Pd',
+        role: 'guru_mapel',
+        availableRoles: ['guru_mapel', 'wali_kelas', 'guru_bk'], // Merangkap 3 Peran: Mapel, Walas, BK
+        classId: '9F',
+        teacherCode: 'G24',
+        subject: 'PPKn & Konseling Karakter',
+        isActive: true,
+        email: 'guru.retnopalupi@smpn1mantap.sch.id',
+      },
     ];
   }
 }

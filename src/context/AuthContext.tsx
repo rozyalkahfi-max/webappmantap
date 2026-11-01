@@ -15,7 +15,7 @@ interface AuthContextType {
   resetPassword: (id: string) => string;
   showPortalSelector: boolean;
   setShowPortalSelector: (val: boolean) => void;
-  selectPortalRole: (role: 'guru_mapel' | 'wali_kelas') => void;
+  selectPortalRole: (role: UserRole) => void;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -34,7 +34,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       const savedUser = localStorage.getItem('SIMANTAP_LMS_currentUser');
       if (savedUser) return JSON.parse(savedUser);
     } catch {}
-    // Default to admin or multi-role guru for immediate demo ease
     return SchoolStorage.getDefaultUsers()[0];
   });
 
@@ -60,7 +59,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       if (currentUser) {
         localStorage.setItem('SIMANTAP_LMS_currentUser', JSON.stringify(currentUser));
         if (!currentUser.availableRoles.includes(activeRole)) {
-          setActiveRole(currentUser.role);
+          setActiveRole(currentUser.role || currentUser.availableRoles[0]);
         }
       } else {
         localStorage.removeItem('SIMANTAP_LMS_currentUser');
@@ -72,13 +71,86 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const login = (username: string, _password?: string) => {
     const trimmed = username.trim().toLowerCase();
-    const user = allUsers.find(
+    let user = allUsers.find(
       (u) => u.username.toLowerCase() === trimmed || (u.email && u.email.toLowerCase() === trimmed)
     );
 
-    if (!user) {
+    // If not found in allUsers, check if exists in teachers master
+    const teachers = SchoolStorage.getTeachers();
+    const matchedTeacher = teachers.find(
+      (t) => t.username.toLowerCase() === trimmed || (t.email && t.email.toLowerCase() === trimmed)
+    );
+
+    if (!user && !matchedTeacher) {
       return { success: false, message: 'Username atau email tidak terdaftar dalam sistem.' };
     }
+
+    // Dynamic role calculation based on master teacher data per rule A:
+    // - BK who also teaches -> has guru_mapel and guru_bk
+    // - Pure subject teacher -> only guru_mapel
+    // - Teacher + Wali kelas -> has guru_mapel and wali_kelas
+    // - Teacher + Wali kelas + BK -> has all three!
+    let detectedRoles: UserRole[] = [];
+    let detectedClassId: string | undefined = undefined;
+    let detectedTeacherCode: string | undefined = undefined;
+    let detectedSubject: string | undefined = undefined;
+
+    if (matchedTeacher) {
+      detectedClassId = matchedTeacher.classId;
+      detectedTeacherCode = matchedTeacher.teacherCode;
+      detectedSubject = matchedTeacher.subject;
+
+      const isBk =
+        matchedTeacher.role === 'guru_bk' ||
+        matchedTeacher.subject.toLowerCase().includes('konseling') ||
+        matchedTeacher.subject.toLowerCase().includes('bk');
+      if (isBk) detectedRoles.push('guru_bk');
+
+      const isWalas = !!matchedTeacher.classId || matchedTeacher.role === 'wali_kelas';
+      if (isWalas) detectedRoles.push('wali_kelas');
+
+      const isMapel =
+        matchedTeacher.role === 'guru_mapel' ||
+        (matchedTeacher.subject &&
+          !matchedTeacher.subject.toLowerCase().startsWith('operator') &&
+          !matchedTeacher.subject.toLowerCase().startsWith('manajemen'));
+      if (isMapel && !detectedRoles.includes('guru_mapel')) {
+        detectedRoles.push('guru_mapel');
+      }
+
+      if (matchedTeacher.role === 'admin_operator') detectedRoles = ['admin_operator'];
+      if (matchedTeacher.role === 'kepala_sekolah') detectedRoles = ['kepala_sekolah'];
+    }
+
+    if (!user && matchedTeacher) {
+      user = {
+        id: `USR_${matchedTeacher.id}`,
+        username: matchedTeacher.username,
+        name: matchedTeacher.name,
+        role: detectedRoles[0] || matchedTeacher.role,
+        availableRoles: detectedRoles.length > 0 ? detectedRoles : [matchedTeacher.role],
+        classId: detectedClassId,
+        teacherCode: detectedTeacherCode,
+        subject: detectedSubject,
+        isActive: matchedTeacher.status === 'Aktif',
+        email: matchedTeacher.email,
+      };
+    } else if (user && matchedTeacher) {
+      // Merge detected roles from teacher master
+      const combinedRoles = Array.from(new Set([...user.availableRoles, ...detectedRoles]));
+      user = {
+        ...user,
+        availableRoles: combinedRoles,
+        classId: detectedClassId || user.classId,
+        teacherCode: detectedTeacherCode || user.teacherCode,
+        subject: detectedSubject || user.subject,
+      };
+    }
+
+    if (!user) {
+      return { success: false, message: 'Username tidak ditemukan.' };
+    }
+
     if (!user.isActive) {
       return { success: false, message: 'Akun Anda berstatus Nonaktif. Hubungi Admin Operator.' };
     }
@@ -88,35 +160,51 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       lastLogin: new Date().toISOString(),
     };
 
-    const isDualTeacher =
-      updatedUser.availableRoles.includes('guru_mapel') &&
-      updatedUser.availableRoles.includes('wali_kelas');
+    const hasMultiRole = updatedUser.availableRoles.length > 1;
 
     setCurrentUser(updatedUser);
-    setAllUsers((prev) => prev.map((u) => (u.id === user.id ? updatedUser : u)));
-    SchoolStorage.logActivity(updatedUser.name, updatedUser.role, 'Login Berhasil', 'Master', `Pengguna ${updatedUser.username} berhasil masuk ke aplikasi.`);
+    setAllUsers((prev) => {
+      const exists = prev.some((u) => u.id === updatedUser.id);
+      return exists ? prev.map((u) => (u.id === updatedUser.id ? updatedUser : u)) : [...prev, updatedUser];
+    });
 
-    if (isDualTeacher) {
+    SchoolStorage.logActivity(
+      updatedUser.name,
+      updatedUser.role,
+      'Login Berhasil',
+      'Master',
+      `Pengguna ${updatedUser.username} berhasil masuk ke aplikasi (${updatedUser.availableRoles.join(', ')}).`
+    );
+
+    if (hasMultiRole) {
       setShowPortalSelector(true);
-      setActiveRole(updatedUser.role || 'guru_mapel');
+      setActiveRole(updatedUser.availableRoles[0]);
     } else {
       setShowPortalSelector(false);
-      setActiveRole(updatedUser.role);
+      setActiveRole(updatedUser.availableRoles[0] || updatedUser.role);
     }
 
     return { success: true };
   };
 
-  const selectPortalRole = (role: 'guru_mapel' | 'wali_kelas') => {
+  const selectPortalRole = (role: UserRole) => {
     setActiveRole(role);
     setShowPortalSelector(false);
     if (currentUser) {
+      const roleText =
+        role === 'guru_mapel'
+          ? 'Guru Mata Pelajaran'
+          : role === 'wali_kelas'
+          ? `Wali Kelas (${currentUser.classId || ''})`
+          : role === 'guru_bk'
+          ? 'Guru Bimbingan Konseling (BK)'
+          : role;
       SchoolStorage.logActivity(
         currentUser.name,
         role,
         'Pilih Portal Masuk',
         'Master',
-        `Memilih masuk sebagai ${role === 'guru_mapel' ? 'Guru Mata Pelajaran' : `Wali Kelas (${currentUser.classId || ''})`}.`
+        `Memilih masuk sebagai ${roleText}.`
       );
     }
   };

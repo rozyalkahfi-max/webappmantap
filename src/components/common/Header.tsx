@@ -188,12 +188,13 @@ export const Header: React.FC<HeaderProps> = ({
               </div>
               <div className="space-y-1 mt-1">
                 {[
-                  { user: 'admin', label: 'Admin Operator', sub: 'Kelola master, import & konfigurasi' },
-                  { user: 'kepsek', label: 'Dr. H. Mulyono (Kepsek)', sub: 'Dashboard eksekutif & monitoring' },
-                  { user: 'guru.sitirahmawati', label: 'Dra. Hj. Siti Rahmawati', sub: 'Multi-Role: Guru BIN & Wali Kelas 7A' },
-                  { user: 'guru.budihermawan', label: 'Budi Hermawan (Wali 7B)', sub: 'Multi-Role: Guru MAT & Wali 7B' },
-                  { user: 'guru.nurulfaizah', label: 'Nurul Faizah (Guru IPA)', sub: 'Guru Mata Pelajaran Murni' },
-                  { user: 'guru.bambangbk', label: 'Drs. Bambang Irawan (BK)', sub: 'Konselor BK - Penanganan Kasus' },
+                  { user: 'admin', label: '1. Admin Operator', sub: 'Master Data & Import Massal' },
+                  { user: 'kepsek', label: '2. Kepala Sekolah', sub: 'Pemantauan Eksekutif & Laporan Realtime' },
+                  { user: 'guru.nurulfaizah', label: '3a. Guru Mapel Murni', sub: 'Nurul Faizah (1 Peran: Mapel IPA)' },
+                  { user: 'guru.sitirahmawati', label: '3b. Guru Mapel + Walas', sub: 'Siti Rahmawati (2 Peran: Mapel & Wali 7A)' },
+                  { user: 'guru.bambangbk', label: '3c. Guru BK (Konselor)', sub: 'Bambang Irawan (1 Peran: Guru BK)' },
+                  { user: 'guru.sitiaminahbk', label: '3d. Guru BK & Mengajar', sub: 'Siti Aminah (2 Peran: BK + Mapel)' },
+                  { user: 'guru.multiperan', label: '3e. Guru Merangkap 3 Jabatan', sub: 'Retno Palupi (3 Peran: Mapel, Walas, BK)' },
                 ].map((item) => (
                   <button
                     key={item.user}
@@ -364,13 +365,13 @@ export const Header: React.FC<HeaderProps> = ({
 
               <div className="py-1">
                 {/* Ganti Portal Akses (Khusus Guru Multi-Role) */}
-                {currentUser?.availableRoles?.includes('guru_mapel') && currentUser?.availableRoles?.includes('wali_kelas') && (
+                {currentUser?.availableRoles && currentUser.availableRoles.length > 1 && (
                   <button
                     onClick={() => {
                       setShowPortalSelector(true);
                       setShowUserMenu(false);
                     }}
-                    className="w-full text-left px-3 py-2 hover:bg-indigo-50 rounded text-indigo-700 font-semibold flex items-center gap-2"
+                    className="w-full text-left px-3 py-2 hover:bg-indigo-50 rounded text-indigo-700 font-semibold flex items-center gap-2 cursor-pointer"
                   >
                     <Layers className="w-4 h-4 text-indigo-600" />
                     <span>Pilih / Ganti Portal Masuk</span>

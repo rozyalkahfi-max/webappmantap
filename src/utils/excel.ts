@@ -252,6 +252,23 @@ export interface ValidationItemResult<T> {
   isDuplicate: boolean;
 }
 
+export type ValidationItem<T> = ValidationItemResult<T>;
+
+export function findFieldValue(row: Record<string, any>, candidateKeys: string[]): any {
+  if (!row || typeof row !== 'object') return undefined;
+  const rowKeys = Object.keys(row);
+  for (const candidate of candidateKeys) {
+    const candidateNormalized = candidate.toLowerCase().replace(/[\s_-]+/g, '');
+    for (const key of rowKeys) {
+      const keyNormalized = key.toLowerCase().replace(/[\s_-]+/g, '');
+      if (keyNormalized === candidateNormalized) {
+        return row[key];
+      }
+    }
+  }
+  return undefined;
+}
+
 export interface ValidationSummary<T> {
   totalRows: number;
   validRows: number;

@@ -202,6 +202,20 @@ export const ExcelImportView: React.FC = () => {
     }
   };
 
+  if (!isAdmin) {
+    return (
+      <div className="bg-rose-50 border border-rose-200 rounded-2xl p-8 text-center max-w-lg mx-auto my-12 text-slate-800 space-y-3">
+        <div className="w-12 h-12 rounded-xl bg-rose-100 text-rose-700 flex items-center justify-center mx-auto">
+          <FileWarning className="w-6 h-6" />
+        </div>
+        <h3 className="text-base font-bold text-rose-900">Akses Dibatasi: Khusus Admin Operator</h3>
+        <p className="text-xs text-rose-700 leading-relaxed">
+          Kewenangan mengatur data aplikasi dan import data massal (Excel) hanya dapat dilakukan melalui akun Admin Operator demi menjaga integritas data sistem sekolah.
+        </p>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6">
       {/* Title & Kicker */}

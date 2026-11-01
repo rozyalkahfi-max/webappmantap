@@ -61,6 +61,57 @@ export const BKDashboard: React.FC<{ onNavigate: (menuId: string) => void }> = (
         </div>
       </div>
 
+      {/* Automatic Red Warning Banner for BK Priority Cases (>30-50+ points) - Requirement 8 */}
+      {totalPriority > 0 && (
+        <div className="p-4 bg-gradient-to-r from-red-700 via-rose-600 to-red-800 text-white rounded-xl shadow-lg border-2 border-red-500 animate-in fade-in space-y-2.5">
+          <div className="flex items-start gap-3">
+            <div className="w-9 h-9 rounded-xl bg-white/20 flex items-center justify-center shrink-0">
+              <ShieldAlert className="w-5 h-5 text-white animate-pulse" />
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <span className="text-[10px] font-bold uppercase tracking-widest bg-white/20 text-white px-2 py-0.5 rounded">
+                  Peringatan Merah Otomatis Sistem BK
+                </span>
+                <span className="text-xs text-rose-200 font-mono">Batas Eskalasi: 30–50+ Poin</span>
+              </div>
+              <h3 className="font-bold text-sm tracking-tight text-white mt-0.5">
+                🚨 Perhatian Konselor: {totalPriority} Siswa Mencapai Akumulasi Poin Di Atas 30–50
+              </h3>
+              <p className="text-xs text-rose-100 mt-1 leading-relaxed">
+                Pelanggaran di bawah 30 poin telah dibimbing oleh Wali Kelas masing-masing. Siswa dengan akumulasi &gt;30 poin di bawah ini memerlukan tindak lanjut langsung dari Guru BK (Konseling individual, mediasi, surat pemanggilan orang tua, dan kontrak perilaku).
+              </p>
+            </div>
+          </div>
+
+          <div className="flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-rose-500/60">
+            <div className="flex flex-wrap gap-2">
+              {priorityBkStudents.map((item) => (
+                <div
+                  key={item.student.id}
+                  className="bg-white text-slate-900 px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-2 shadow-xs"
+                >
+                  <span className="font-bold">{item.student.name}</span>
+                  <span className="font-mono text-[10px] bg-slate-100 px-1.5 py-0.5 rounded text-slate-600">
+                    Kelas {item.student.classId}
+                  </span>
+                  <span className="font-mono font-bold text-rose-700 bg-rose-50 px-2 py-0.5 rounded border border-rose-200">
+                    {item.totalPoints} Poin
+                  </span>
+                </div>
+              ))}
+            </div>
+
+            <button
+              onClick={() => onNavigate('counseling')}
+              className="px-3 py-1.5 bg-white text-rose-700 hover:bg-rose-50 rounded-lg text-xs font-bold transition-colors shadow-xs cursor-pointer shrink-0"
+            >
+              Buka Form Penanganan Kasus →
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* KPI Cards */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
         <StatCard

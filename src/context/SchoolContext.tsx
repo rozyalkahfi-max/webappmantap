@@ -89,6 +89,7 @@ interface SchoolContextType {
 
   violations: ViolationRecord[];
   addViolation: (record: Omit<ViolationRecord, 'id'>) => void;
+  updateViolation: (id: string, updates: Partial<ViolationRecord>) => void;
   deleteViolation: (id: string) => void;
   getStudentPoints: (studentId: string) => number;
   getStudentViolationCategory: (points: number) => { label: string; color: string; badge: string };
@@ -1016,6 +1017,18 @@ export const SchoolProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     }
   };
 
+  const updateViolation = (id: string, updates: Partial<ViolationRecord>) => {
+    setViolations((prev) =>
+      prev.map((v) => (v.id === id ? { ...v, ...updates } : v))
+    );
+    const target = violations.find((v) => v.id === id);
+    logAction(
+      'Tindak Lanjut Pembinaan',
+      'Pelanggaran',
+      `Memperbarui tindak lanjut pembinaan siswa ${target?.studentName || id}`
+    );
+  };
+
   const deleteViolation = (id: string) => {
     const target = violations.find((v) => v.id === id);
     setViolations((prev) => prev.filter((v) => v.id !== id));
@@ -1224,6 +1237,7 @@ export const SchoolProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         saveDailyScoreBatch,
         violations,
         addViolation,
+        updateViolation,
         deleteViolation,
         getStudentPoints,
         getStudentViolationCategory,

@@ -9,6 +9,8 @@ import {
   HeartHandshake,
   ArrowRight,
   TrendingUp,
+  CheckSquare,
+  FileText,
 } from 'lucide-react';
 import { useSchool } from '../../context/SchoolContext';
 import { useAuth } from '../../context/AuthContext';
@@ -79,13 +81,20 @@ export const WaliKelasDashboard: React.FC<{ onNavigate: (menuId: string) => void
           </p>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           <button
-            onClick={() => onNavigate('leger')}
-            className="flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-xs font-semibold shadow-xs transition-colors cursor-pointer"
+            onClick={() => onNavigate('wali_attendance')}
+            className="flex items-center gap-1.5 px-3 py-2 bg-white/10 hover:bg-white/20 text-white rounded-lg text-xs font-semibold shadow-xs transition-colors cursor-pointer border border-white/20"
           >
-            <FileSpreadsheet className="w-4 h-4" />
-            <span>Buka Leger Terpadu</span>
+            <CheckSquare className="w-3.5 h-3.5" />
+            <span>Rekap Kehadiran</span>
+          </button>
+          <button
+            onClick={() => onNavigate('wali_class_reports')}
+            className="flex items-center gap-1.5 px-3.5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-xs font-semibold shadow-xs transition-colors cursor-pointer"
+          >
+            <FileText className="w-3.5 h-3.5" />
+            <span>Cetak Laporan Kelas</span>
           </button>
         </div>
       </div>
