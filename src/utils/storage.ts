@@ -71,7 +71,30 @@ export const CLASS_IDS: string[] = [
   '9A', '9B', '9C', '9D', '9E', '9F', '9G', '9H',
 ];
 
-// Generator for 50 teachers
+export const ADMIN_TEACHER: Teacher = {
+  id: 'TCH_ADM',
+  username: 'admin',
+  name: 'Admin Operator IT',
+  nip: '19900101 201501 1 001',
+  role: 'admin_operator',
+  teacherCode: 'ADM',
+  subject: 'Operator IT & Administrator',
+  status: 'Aktif',
+  email: 'admin@smpn1mantap.sch.id',
+  phone: '08123456000',
+};
+
+export const ADMIN_USER: UserAccount = {
+  id: 'USR001',
+  username: 'admin',
+  name: 'Admin Operator IT',
+  role: 'admin_operator',
+  availableRoles: ['admin_operator'],
+  isActive: true,
+  email: 'admin@smpn1mantap.sch.id',
+};
+
+// Generator for 50 teachers (preserved as reference / optional sample data)
 function generateDefaultTeachers(): Teacher[] {
   const teacherData = [
     { name: 'Dr. H. Mulyono, M.Pd', nip: '19720415 199803 1 004', subject: 'Manajemen Sekolah', code: 'G00', role: 'kepala_sekolah' as const, username: 'kepsek.mulyono' },
@@ -101,31 +124,7 @@ function generateDefaultTeachers(): Teacher[] {
     { name: 'Dra. Retno Palupi', nip: '19710526 199703 2 004', subject: 'Pendidikan Pancasila dan Kewarganegaraan', code: 'G24', role: 'wali_kelas' as const, classId: '9F', username: 'guru.retnopalupi' },
     { name: 'Lukman Hakim, M.Pd.I', nip: '19830716 200801 1 013', subject: 'Pendidikan Agama dan Budi Pekerti', code: 'G25', role: 'wali_kelas' as const, classId: '9G', username: 'guru.lukmanhakim' },
     { name: 'Yunita Sari, S.Pd', nip: '19891209 201402 2 010', subject: 'Ilmu Pengetahuan Sosial', code: 'G26', role: 'wali_kelas' as const, classId: '9H', username: 'guru.yunitasari' },
-    // Guru Mapel non-wali kelas
-    { name: 'Arif Wicaksono, S.Pd', nip: '19880115 201201 1 009', subject: 'Bahasa Indonesia', code: 'G27', role: 'guru_mapel' as const, username: 'guru.arifwicaksono' },
-    { name: 'Fitri Handayani, S.Pd', nip: '19920405 201701 2 006', subject: 'Matematika', code: 'G28', role: 'guru_mapel' as const, username: 'guru.fitrihandayani' },
-    { name: 'Gilang Ramadhan, S.Pd', nip: '19930718 201802 1 004', subject: 'Ilmu Pengetahuan Alam', code: 'G29', role: 'guru_mapel' as const, username: 'guru.gilangramadhan' },
-    { name: 'Hani Masitoh, S.Pd', nip: '19890922 201302 2 007', subject: 'Bahasa Inggris', code: 'G30', role: 'guru_mapel' as const, username: 'guru.hanimasitoh' },
-    { name: 'Imam Ghozali, S.Pd', nip: '19840311 200801 1 016', subject: 'Pendidikan Agama dan Budi Pekerti', code: 'G31', role: 'guru_mapel' as const, username: 'guru.imamghozali' },
-    { name: 'Juwita Puspita, S.Pd', nip: '19901004 201503 2 009', subject: 'Seni Budaya', code: 'G32', role: 'guru_mapel' as const, username: 'guru.juwitapuspita' },
-    { name: 'Krisna Murti, S.Kom', nip: '19920830 201601 1 008', subject: 'Informatika', code: 'G33', role: 'guru_mapel' as const, username: 'guru.krisnamurti' },
-    { name: 'Lia Kartika, S.Pd', nip: '19860619 201001 2 021', subject: 'Prakarya', code: 'G34', role: 'guru_mapel' as const, username: 'guru.liakartika' },
-    { name: 'Moch. Yusuf, S.Pd', nip: '19810815 200501 1 014', subject: 'Pendidikan Jasmani, Olahraga & Kesehatan', code: 'G35', role: 'guru_mapel' as const, username: 'guru.mochyusuf' },
-    { name: 'Novi Anggraini, S.Pd', nip: '19940211 201902 2 005', subject: 'Ilmu Pengetahuan Sosial', code: 'G36', role: 'guru_mapel' as const, username: 'guru.novianggraini' },
-    { name: 'Oki Setiawan, S.Pd', nip: '19870503 201101 1 017', subject: 'Pendidikan Pancasila dan Kewarganegaraan', code: 'G37', role: 'guru_mapel' as const, username: 'guru.okisetiawan' },
-    { name: 'Pratiwi Sulistyo, S.Pd', nip: '19910729 201501 2 012', subject: 'Bahasa Daerah', code: 'G38', role: 'guru_mapel' as const, username: 'guru.pratiwisulistyo' },
-    { name: 'Qomaruzzaman, S.Pd.I', nip: '19850114 200902 1 010', subject: 'Pendidikan Agama dan Budi Pekerti', code: 'G39', role: 'guru_mapel' as const, username: 'guru.qomaruzzaman' },
-    { name: 'Rudy Hartono, S.Pd', nip: '19831120 200701 1 019', subject: 'Matematika', code: 'G40', role: 'guru_mapel' as const, username: 'guru.rudyhartono' },
-    { name: 'Septi Rahayu, S.Si', nip: '19900912 201401 2 014', subject: 'Ilmu Pengetahuan Alam', code: 'G41', role: 'guru_mapel' as const, username: 'guru.septirahayu' },
-    { name: 'Teguh Wibowo, S.Pd', nip: '19820417 200604 1 018', subject: 'Bahasa Indonesia', code: 'G42', role: 'guru_mapel' as const, username: 'guru.teguhwibowo' },
-    { name: 'Utami Ningsih, S.Pd', nip: '19881105 201202 2 015', subject: 'Bahasa Inggris', code: 'G43', role: 'guru_mapel' as const, username: 'guru.utaminingsih' },
-    { name: 'Vicky Pratama, S.Pd', nip: '19930324 201801 1 007', subject: 'Pendidikan Jasmani, Olahraga & Kesehatan', code: 'G44', role: 'guru_mapel' as const, username: 'guru.vickypratama' },
-    { name: 'Wulan Dwi Astuti, S.Pd', nip: '19920116 201602 2 011', subject: 'Seni Budaya', code: 'G45', role: 'guru_mapel' as const, username: 'guru.wulandwi' },
-    { name: 'Yayan Mulyana, S.Kom', nip: '19890623 201301 1 012', subject: 'Informatika', code: 'G46', role: 'guru_mapel' as const, username: 'guru.yayanmulyana' },
-    { name: 'Zulfa Zakiyah, S.Pd', nip: '19910519 201502 2 016', subject: 'Prakarya', code: 'G47', role: 'guru_mapel' as const, username: 'guru.zulfazakiyah' },
-    { name: 'Bagus Priyambodo, S.Pd', nip: '19860827 201001 1 022', subject: 'Ilmu Pengetahuan Sosial', code: 'G48', role: 'guru_mapel' as const, username: 'guru.baguspriyambodo' },
-    { name: 'Cahya Kamila, S.Pd', nip: '19940714 201901 2 009', subject: 'Bahasa Daerah', code: 'G49', role: 'guru_mapel' as const, username: 'guru.cahyakamila' },
-    { name: 'Admin Operator Sekolah', nip: '19900101 201501 1 001', subject: 'Operator IT', code: 'ADM', role: 'admin_operator' as const, username: 'admin' },
+    { name: 'Admin Operator IT', nip: '19900101 201501 1 001', subject: 'Operator IT', code: 'ADM', role: 'admin_operator' as const, username: 'admin' },
   ];
 
   return teacherData.map((t, idx) => ({
@@ -134,7 +133,7 @@ function generateDefaultTeachers(): Teacher[] {
     name: t.name,
     nip: t.nip,
     role: t.role,
-    classId: t.classId,
+    classId: (t as any).classId,
     teacherCode: t.code,
     subject: t.subject,
     status: 'Aktif',
@@ -723,17 +722,17 @@ export class SchoolStorage {
 
   // Master Subjects
   static getSubjects(): Subject[] {
-    return this.getItem<Subject[]>('subjects', DEFAULT_SUBJECTS);
+    return this.getItem<Subject[]>('subjects', []);
   }
   static saveSubjects(subjects: Subject[]): void {
     this.setItem('subjects', subjects);
   }
 
-  // Teachers
+  // Teachers (Only Admin by default)
   static getTeachers(): Teacher[] {
     const existing = this.getItem<Teacher[] | null>('teachers', null);
     if (existing && existing.length > 0) return existing;
-    const initial = generateDefaultTeachers();
+    const initial = [ADMIN_TEACHER];
     this.saveTeachers(initial);
     return initial;
   }
@@ -744,26 +743,8 @@ export class SchoolStorage {
   // Classes
   static getClasses(): ClassRoom[] {
     const existing = this.getItem<ClassRoom[] | null>('classes', null);
-    if (existing && existing.length > 0) return existing;
-
-    const teachers = this.getTeachers();
-    const initial: ClassRoom[] = CLASS_IDS.map((cId, idx) => {
-      const homeroom = teachers.find((t) => t.classId === cId);
-      const grade = cId.charAt(0) as '7' | '8' | '9';
-      return {
-        classId: cId,
-        name: cId,
-        gradeLevel: grade,
-        homeroomTeacherId: homeroom?.teacherCode || homeroom?.username || `G${String(idx + 1).padStart(2, '0')}`,
-        homeroomTeacherName: homeroom?.name || `Wali Kelas ${cId}`,
-        studentCount: idx % 2 === 0 ? 30 : 29,
-        academicYear: '2026/2027',
-        status: 'Aktif',
-      };
-    });
-
-    this.saveClasses(initial);
-    return initial;
+    if (existing) return existing;
+    return [];
   }
   static getFreshDefaultClasses(): ClassRoom[] {
     const teachers = generateDefaultTeachers();
@@ -798,10 +779,8 @@ export class SchoolStorage {
   // Students
   static getStudents(): Student[] {
     const existing = this.getItem<Student[] | null>('students', null);
-    if (existing && existing.length > 0) return existing;
-    const initial = generate708Students();
-    this.saveStudents(initial);
-    return initial;
+    if (existing) return existing;
+    return [];
   }
   static saveStudents(students: Student[]): void {
     this.setItem('students', students);
@@ -810,11 +789,8 @@ export class SchoolStorage {
   // Schedules
   static getSchedules(): ScheduleItem[] {
     const existing = this.getItem<ScheduleItem[] | null>('schedules', null);
-    if (existing && existing.length > 0) return existing;
-    const teachers = this.getTeachers();
-    const initial = generateDefaultSchedule(teachers);
-    this.saveSchedules(initial);
-    return initial;
+    if (existing) return existing;
+    return [];
   }
   static getFreshDefaultSchedules(): ScheduleItem[] {
     const teachers = this.getTeachers();
@@ -827,12 +803,8 @@ export class SchoolStorage {
   // Attendance Sessions
   static getAttendanceSessions(): AttendanceSession[] {
     const existing = this.getItem<AttendanceSession[] | null>('attendance_sessions', null);
-    if (existing && existing.length > 0) return existing;
-    const students = this.getStudents();
-    const schedules = this.getSchedules();
-    const initial = generateDefaultAttendance(students, schedules);
-    this.saveAttendanceSessions(initial);
-    return initial;
+    if (existing) return existing;
+    return [];
   }
   static saveAttendanceSessions(sessions: AttendanceSession[]): void {
     this.setItem('attendance_sessions', sessions);
@@ -841,11 +813,8 @@ export class SchoolStorage {
   // Grades
   static getGrades(): StudentGrade[] {
     const existing = this.getItem<StudentGrade[] | null>('grades', null);
-    if (existing && existing.length > 0) return existing;
-    const students = this.getStudents();
-    const initial = generateDefaultGrades(students);
-    this.saveGrades(initial);
-    return initial;
+    if (existing) return existing;
+    return [];
   }
   static saveGrades(grades: StudentGrade[]): void {
     this.setItem('grades', grades);
@@ -854,12 +823,8 @@ export class SchoolStorage {
   // Violations
   static getViolations(): ViolationRecord[] {
     const existing = this.getItem<ViolationRecord[] | null>('violations', null);
-    if (existing && existing.length > 0) return existing;
-    const students = this.getStudents();
-    const teachers = this.getTeachers();
-    const initial = generateDefaultViolations(students, teachers);
-    this.saveViolations(initial);
-    return initial;
+    if (existing) return existing;
+    return [];
   }
   static saveViolations(violations: ViolationRecord[]): void {
     this.setItem('violations', violations);
@@ -890,11 +855,8 @@ export class SchoolStorage {
   // BK Counseling Records
   static getCounselingRecords(): CounselingRecord[] {
     const existing = this.getItem<CounselingRecord[] | null>('counseling', null);
-    if (existing && existing.length > 0) return existing;
-    const students = this.getStudents();
-    const initial = generateDefaultCounseling(students);
-    this.saveCounselingRecords(initial);
-    return initial;
+    if (existing) return existing;
+    return [];
   }
   static saveCounselingRecords(records: CounselingRecord[]): void {
     this.setItem('counseling', records);
@@ -903,11 +865,8 @@ export class SchoolStorage {
   // Attitudes
   static getAttitudes(): AttitudeAssessment[] {
     const existing = this.getItem<AttitudeAssessment[] | null>('attitudes', null);
-    if (existing && existing.length > 0) return existing;
-    const students = this.getStudents();
-    const initial = generateDefaultAttitudes(students);
-    this.saveAttitudes(initial);
-    return initial;
+    if (existing) return existing;
+    return [];
   }
   static saveAttitudes(attitudes: AttitudeAssessment[]): void {
     this.setItem('attitudes', attitudes);
@@ -915,7 +874,7 @@ export class SchoolStorage {
 
   // Notifications
   static getNotifications(): SystemNotification[] {
-    return this.getItem<SystemNotification[]>('notifications', generateDefaultNotifications());
+    return this.getItem<SystemNotification[]>('notifications', []);
   }
   static saveNotifications(notifications: SystemNotification[]): void {
     this.setItem('notifications', notifications);
@@ -923,7 +882,17 @@ export class SchoolStorage {
 
   // Activity Logs
   static getActivityLogs(): ActivityLog[] {
-    return this.getItem<ActivityLog[]>('activity_logs', generateDefaultActivityLogs());
+    return this.getItem<ActivityLog[]>('activity_logs', [
+      {
+        id: 'LOG001',
+        timestamp: new Date().toISOString().replace('T', ' ').slice(0, 19),
+        userName: 'Admin Operator IT',
+        userRole: 'admin_operator',
+        action: 'Inisialisasi Sistem Bersih',
+        category: 'Master',
+        details: 'Basis data disiapkan dalam keadaan bersih tanpa data dummy, siap untuk import data demo pengguna.',
+      },
+    ]);
   }
   static saveActivityLogs(logs: ActivityLog[]): void {
     this.setItem('activity_logs', logs);
@@ -944,96 +913,53 @@ export class SchoolStorage {
     this.saveActivityLogs(logs);
   }
 
-  // Pre-configured User Accounts
+  // Pre-configured User Accounts (Only Admin by default)
   static getDefaultUsers(): UserAccount[] {
-    return [
-      {
-        id: 'USR001',
-        username: 'admin',
-        name: 'Admin Operator Sekolah',
-        role: 'admin_operator',
-        availableRoles: ['admin_operator'],
-        isActive: true,
-        email: 'admin@smpn1mantap.sch.id',
-      },
-      {
-        id: 'USR002',
-        username: 'kepsek',
-        name: 'Dr. H. Mulyono, M.Pd',
-        role: 'kepala_sekolah',
-        availableRoles: ['kepala_sekolah'],
-        isActive: true,
-        email: 'kepsek.mulyono@smpn1mantap.sch.id',
-      },
-      {
-        id: 'USR003',
-        username: 'guru.sitirahmawati',
-        name: 'Dra. Hj. Siti Rahmawati, M.Pd',
-        role: 'guru_mapel',
-        availableRoles: ['guru_mapel', 'wali_kelas'], // Multi-role!
-        classId: '7A',
-        teacherCode: 'G01',
-        subject: 'Bahasa Indonesia',
-        isActive: true,
-        email: 'guru.sitirahmawati@smpn1mantap.sch.id',
-      },
-      {
-        id: 'USR004',
-        username: 'guru.budihermawan',
-        name: 'Budi Hermawan, S.Pd',
-        role: 'wali_kelas',
-        availableRoles: ['guru_mapel', 'wali_kelas'], // Multi-role!
-        classId: '7B',
-        teacherCode: 'G02',
-        subject: 'Matematika',
-        isActive: true,
-        email: 'guru.budihermawan@smpn1mantap.sch.id',
-      },
-      {
-        id: 'USR005',
-        username: 'guru.nurulfaizah',
-        name: 'Nurul Faizah, S.Pd., M.Si',
-        role: 'guru_mapel',
-        availableRoles: ['guru_mapel'],
-        teacherCode: 'G03',
-        subject: 'Ilmu Pengetahuan Alam',
-        isActive: true,
-        email: 'guru.nurulfaizah@smpn1mantap.sch.id',
-      },
-      {
-        id: 'USR006',
-        username: 'guru.bambangbk',
-        name: 'Drs. Bambang Irawan, M.Pd',
-        role: 'guru_bk',
-        availableRoles: ['guru_bk'],
-        teacherCode: 'G15',
-        subject: 'Bimbingan Konseling',
-        isActive: true,
-        email: 'guru.bambangbk@smpn1mantap.sch.id',
-      },
-      {
-        id: 'USR007',
-        username: 'guru.sitiaminahbk',
-        name: 'Siti Aminah, S.Pd',
-        role: 'guru_bk',
-        availableRoles: ['guru_mapel', 'guru_bk'], // Multi-role: BK & Mengajar
-        teacherCode: 'G16',
-        subject: 'Bimbingan Konseling & Prakarya',
-        isActive: true,
-        email: 'guru.sitiaminahbk@smpn1mantap.sch.id',
-      },
-      {
-        id: 'USR008',
-        username: 'guru.multiperan',
-        name: 'Dra. Retno Palupi, M.Pd',
-        role: 'guru_mapel',
-        availableRoles: ['guru_mapel', 'wali_kelas', 'guru_bk'], // Merangkap 3 Peran: Mapel, Walas, BK
-        classId: '9F',
-        teacherCode: 'G24',
-        subject: 'PPKn & Konseling Karakter',
-        isActive: true,
-        email: 'guru.retnopalupi@smpn1mantap.sch.id',
-      },
-    ];
+    return [ADMIN_USER];
+  }
+
+  // Clear all operational data except Admin user
+  static clearAllDataExceptAdmin(): void {
+    try {
+      this.setItem('teachers', [ADMIN_TEACHER]);
+      this.setItem('students', []);
+      this.setItem('classes', []);
+      this.setItem('subjects', []);
+      this.setItem('schedules', []);
+      this.setItem('attendance_sessions', []);
+      this.setItem('grades', []);
+      this.setItem('violations', []);
+      this.setItem('counseling', []);
+      this.setItem('attitudes', []);
+      this.setItem('daily_scores', []);
+      this.setItem('notifications', []);
+      this.setItem('activity_logs', [
+        {
+          id: `LOG_${Date.now()}`,
+          timestamp: new Date().toISOString().replace('T', ' ').slice(0, 19),
+          userName: 'Admin Operator IT',
+          userRole: 'admin_operator',
+          action: 'Pengosongan Data',
+          category: 'Master',
+          details: 'Seluruh data operasional dikosongkan. Hanya akun admin yang dipertahankan untuk uji coba import.',
+        },
+      ]);
+      localStorage.setItem('SIMANTAP_LMS_users', JSON.stringify([ADMIN_USER]));
+      localStorage.setItem('SIMANTAP_LMS_currentUser', JSON.stringify(ADMIN_USER));
+      localStorage.setItem('SIMANTAP_DATA_CLEARED_V2', 'true');
+    } catch (e) {
+      console.error('Error clearing data:', e);
+    }
+  }
+}
+
+// Auto purge previous dummy data on client startup to ensure clean slate for user import
+if (typeof window !== 'undefined' && window.localStorage) {
+  try {
+    if (localStorage.getItem('SIMANTAP_DATA_CLEARED_V2') !== 'true') {
+      SchoolStorage.clearAllDataExceptAdmin();
+    }
+  } catch (err) {
+    console.error('Initial clean storage purge error:', err);
   }
 }

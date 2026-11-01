@@ -11,13 +11,14 @@ import {
   FileSpreadsheet,
   ArrowRight,
   ShieldCheck,
+  RotateCcw,
 } from 'lucide-react';
 import { useSchool } from '../../context/SchoolContext';
 import { StatCard } from '../common/StatCard';
 import { InteractiveBarChart, DonutChart } from '../common/InteractiveCharts';
 
 export const AdminDashboard: React.FC<{ onNavigate: (menuId: string) => void }> = ({ onNavigate }) => {
-  const { students, teachers, classes, subjects, schedules, activityLogs } = useSchool();
+  const { students, teachers, classes, subjects, schedules, activityLogs, clearAllExceptAdmin } = useSchool();
 
   const totalStudents = students.length;
   const activeStudents = students.filter((s) => s.status === 'Aktif').length;
@@ -50,24 +51,41 @@ export const AdminDashboard: React.FC<{ onNavigate: (menuId: string) => void }> 
       {/* Welcome Banner */}
       <div className="bg-gradient-to-r from-slate-900 via-blue-950 to-slate-900 rounded-2xl p-6 text-white shadow-lg border border-slate-800 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <span className="text-xs font-semibold text-blue-400 uppercase tracking-widest">
-            Portal Administrasi Terpadu
-          </span>
+          <div className="flex items-center gap-2">
+            <span className="text-xs font-semibold text-blue-400 uppercase tracking-widest">
+              Portal Administrasi Terpadu
+            </span>
+            <span className="text-[10px] bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 px-2 py-0.5 rounded-full font-semibold">
+              Mode Uji Coba Import Bersih
+            </span>
+          </div>
           <h2 className="text-xl font-bold tracking-tight text-white mt-1">
-            Dashboard Admin Operator Sekolah
+            Dashboard Admin Operator IT
           </h2>
           <p className="text-xs text-slate-300 mt-1 max-w-xl leading-relaxed">
-            Pusat pengelolaan master data 708 Siswa, 50 Guru, 24 Rombel, Jadwal Pembelajaran, serta fasilitas Import Data Excel massal.
+            Data operasional telah dikosongkan untuk memberi ruang pengujian import data demo Excel Anda. Gunakan menu Import Excel Massal untuk memasukkan data siswa, guru, rombel, mapel, dan jadwal.
           </p>
         </div>
 
-        <div className="flex items-center gap-2 shrink-0">
+        <div className="flex items-center gap-2 shrink-0 flex-wrap">
           <button
             onClick={() => onNavigate('import_excel')}
             className="flex items-center gap-2 px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-semibold shadow-xs transition-colors cursor-pointer"
           >
             <FileSpreadsheet className="w-4 h-4" />
             <span>Import Excel Massal</span>
+          </button>
+          <button
+            onClick={() => {
+              if (window.confirm('Kosongkan kembali semua data operasional dan hanya sisakan akun admin?')) {
+                clearAllExceptAdmin();
+              }
+            }}
+            className="flex items-center gap-1.5 px-3 py-2.5 bg-slate-800 hover:bg-rose-950/60 hover:text-rose-300 hover:border-rose-700 border border-slate-700 text-slate-300 rounded-lg text-xs font-medium transition-colors cursor-pointer"
+            title="Kosongkan ulang data jika ingin mengulang pengujian import"
+          >
+            <RotateCcw className="w-3.5 h-3.5" />
+            <span>Reset Data Bersih</span>
           </button>
         </div>
       </div>

@@ -310,8 +310,8 @@ export function validateStudentsImport(
     if (!nis) errors.push('NIS wajib diisi');
     if (!name) errors.push('Nama siswa wajib diisi');
     if (!classId) errors.push('Kelas wajib diisi');
-    else if (!availableClasses.includes(classId)) {
-      errors.push(`Kelas '${classId}' tidak terdaftar di sistem (Tersedia: 7A-7H, 8A-8H, 9A-9H)`);
+    else if (availableClasses.length > 0 && !availableClasses.includes(classId)) {
+      errors.push(`Kelas '${classId}' belum terdaftar di master kelas (Tersedia: ${availableClasses.join(', ')})`);
     }
 
     if (id) {

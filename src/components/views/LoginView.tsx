@@ -1,14 +1,14 @@
 import React, { useState } from 'react';
-import { Shield, Eye, EyeOff, Lock, User, Sparkles, School, ArrowRight, CheckCircle2 } from 'lucide-react';
+import { Shield, Eye, EyeOff, Lock, User, Sparkles, School, ArrowRight, CheckCircle2, Database, Upload } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { useSchool } from '../../context/SchoolContext';
 
 export const LoginView: React.FC = () => {
   const { login } = useAuth();
-  const { settings } = useSchool();
+  const { settings, teachers } = useSchool();
 
   const [username, setUsername] = useState('admin');
-  const [password, setPassword] = useState('password123');
+  const [password, setPassword] = useState('admin123');
   const [showPassword, setShowPassword] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -27,11 +27,13 @@ export const LoginView: React.FC = () => {
     }, 250);
   };
 
-  const handleQuickLogin = (uname: string) => {
+  const handleQuickLogin = (uname: string, pwd = 'admin123') => {
     setUsername(uname);
-    setPassword('password123');
-    login(uname, 'password123');
+    setPassword(pwd);
+    login(uname, pwd);
   };
+
+  const otherTeachers = teachers.filter((t) => t.role !== 'admin_operator');
 
   return (
     <div className="min-h-screen bg-slate-900 flex flex-col justify-center items-center p-4 sm:p-6 text-slate-100">
@@ -56,22 +58,22 @@ export const LoginView: React.FC = () => {
               <p className="text-xs text-slate-300 leading-relaxed">
                 {settings.appSubtitle}.
               </p>
-              <div className="pt-2 flex flex-col gap-2 text-xs text-slate-300">
+              <div className="pt-2 flex flex-col gap-2.5 text-xs text-slate-300">
                 <div className="flex items-center gap-2">
-                  <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
-                  <span>24 Rombongan Belajar (7A–9H)</span>
+                  <Database className="w-4 h-4 text-emerald-400 shrink-0" />
+                  <span className="text-emerald-300 font-semibold">Basis Data Bersih (Siap Import Demo)</span>
                 </div>
                 <div className="flex items-center gap-2">
                   <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
-                  <span>Kapasitas 708 Siswa Terintegrasi</span>
+                  <span>Akun Utama: Admin Operator IT Aktif</span>
                 </div>
                 <div className="flex items-center gap-2">
                   <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
-                  <span>50 Tenaga Pendidik & Multi-Role Guru</span>
+                  <span>Format Import Excel: Siswa, Guru, Rombel, Jadwal</span>
                 </div>
                 <div className="flex items-center gap-2">
                   <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
-                  <span>Deteksi Otomatis Pembinaan BK &gt;30 Poin</span>
+                  <span>Deteksi Otomatis Multi-Role (Mapel, Walas, BK)</span>
                 </div>
               </div>
             </div>
@@ -89,10 +91,48 @@ export const LoginView: React.FC = () => {
             <div className="flex items-center justify-between">
               <div>
                 <h3 className="text-lg font-bold text-slate-900">Masuk ke Portal</h3>
-                <p className="text-xs text-slate-500 mt-0.5">Gunakan akun pengguna terdaftar Anda</p>
+                <p className="text-xs text-slate-500 mt-0.5">Gunakan akun admin untuk mengelola dan import data</p>
               </div>
               <div className="w-8 h-8 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center">
                 <Lock className="w-4 h-4" />
+              </div>
+            </div>
+
+            {/* Admin Testing Account Highlight Banner */}
+            <div className="mt-4 p-3.5 bg-gradient-to-r from-blue-50 to-indigo-50 border-2 border-blue-200 rounded-xl">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <Shield className="w-4 h-4 text-blue-700" />
+                  <span className="text-xs font-bold text-blue-950">Akun Pengujian Admin:</span>
+                </div>
+                <span className="text-[10px] bg-emerald-100 text-emerald-800 font-bold px-2 py-0.5 rounded-md border border-emerald-300">
+                  Siap Uji Import
+                </span>
+              </div>
+              <div className="mt-2.5 grid grid-cols-2 gap-2 text-xs">
+                <div className="bg-white p-2 rounded-lg border border-blue-100 shadow-2xs">
+                  <span className="text-[10px] text-slate-500 block font-medium">Username:</span>
+                  <span className="font-mono font-bold text-blue-900 text-sm">admin</span>
+                </div>
+                <div className="bg-white p-2 rounded-lg border border-blue-100 shadow-2xs">
+                  <span className="text-[10px] text-slate-500 block font-medium">Password:</span>
+                  <span className="font-mono font-bold text-blue-900 text-sm">admin123</span>
+                </div>
+              </div>
+              <div className="mt-2.5 flex items-center justify-between">
+                <p className="text-[10px] text-slate-600">
+                  Data selain admin telah dikosongkan untuk uji coba import data Excel Anda.
+                </p>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setUsername('admin');
+                    setPassword('admin123');
+                  }}
+                  className="text-[10px] font-bold text-blue-700 hover:text-blue-800 underline cursor-pointer shrink-0 ml-2"
+                >
+                  Isi Formulir
+                </button>
               </div>
             </div>
 
@@ -102,7 +142,7 @@ export const LoginView: React.FC = () => {
               </div>
             )}
 
-            <form onSubmit={handleSubmit} className="mt-6 space-y-4">
+            <form onSubmit={handleSubmit} className="mt-5 space-y-4">
               <div>
                 <label className="block text-xs font-semibold text-slate-700 mb-1">
                   Username atau Email
@@ -115,7 +155,7 @@ export const LoginView: React.FC = () => {
                     onChange={(e) => setUsername(e.target.value)}
                     required
                     placeholder="Masukkan username/email..."
-                    className="w-full pl-9 pr-3 py-2 text-xs border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-transparent text-slate-900"
+                    className="w-full pl-9 pr-3 py-2 text-xs border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-transparent text-slate-900 font-medium"
                   />
                 </div>
               </div>
@@ -132,12 +172,12 @@ export const LoginView: React.FC = () => {
                     onChange={(e) => setPassword(e.target.value)}
                     required
                     placeholder="Masukkan password..."
-                    className="w-full pl-9 pr-9 py-2 text-xs border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-transparent text-slate-900"
+                    className="w-full pl-9 pr-9 py-2 text-xs border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-transparent text-slate-900 font-medium"
                   />
                   <button
                     type="button"
                     onClick={() => setShowPassword(!showPassword)}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 cursor-pointer"
                   >
                     {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                   </button>
@@ -156,8 +196,8 @@ export const LoginView: React.FC = () => {
           </div>
 
           {/* Quick Demo Accounts Selection */}
-          <div className="mt-8 pt-6 border-t border-slate-100">
-            <div className="flex items-center gap-1.5 text-xs font-bold text-slate-700 mb-2.5">
+          <div className="mt-6 pt-5 border-t border-slate-100">
+            <div className="flex items-center gap-1.5 text-xs font-bold text-slate-700 mb-2">
               <Sparkles className="w-3.5 h-3.5 text-blue-600" />
               <span>Login Cepat Pengujian:</span>
             </div>
@@ -167,35 +207,46 @@ export const LoginView: React.FC = () => {
                 {/* 1. Admin Operator */}
                 <button
                   type="button"
-                  onClick={() => handleQuickLogin('admin')}
-                  className="p-2.5 border border-purple-200 bg-purple-50/40 hover:bg-purple-100/70 hover:border-purple-400 rounded-xl text-left transition-all cursor-pointer group"
+                  onClick={() => handleQuickLogin('admin', 'admin123')}
+                  className="p-2.5 border border-purple-200 bg-purple-50/50 hover:bg-purple-100 hover:border-purple-400 rounded-xl text-left transition-all cursor-pointer group"
                 >
                   <div className="flex items-center justify-between">
                     <span className="text-[11px] font-bold text-purple-950 group-hover:text-purple-700">
                       1. Admin Operator
                     </span>
-                    <span className="text-[9px] font-mono px-1.5 py-0.2 rounded bg-purple-200/80 text-purple-900 font-bold">
-                      Master & Import
+                    <span className="text-[9px] font-mono px-1.5 py-0.5 rounded bg-purple-200/80 text-purple-900 font-bold">
+                      Aktif
                     </span>
                   </div>
-                  <p className="text-[10px] text-slate-500 mt-0.5">Kelola data master & import Excel</p>
+                  <p className="text-[10px] text-slate-500 mt-0.5">admin / admin123 • Kelola & Import</p>
                 </button>
 
                 {/* 2. Kepala Sekolah */}
                 <button
                   type="button"
-                  onClick={() => handleQuickLogin('kepsek')}
-                  className="p-2.5 border border-emerald-200 bg-emerald-50/40 hover:bg-emerald-100/70 hover:border-emerald-400 rounded-xl text-left transition-all cursor-pointer group"
+                  onClick={() => {
+                    const kepsekTeacher = teachers.find((t) => t.role === 'kepala_sekolah');
+                    if (kepsekTeacher) {
+                      handleQuickLogin(kepsekTeacher.username, 'admin123');
+                    } else {
+                      setErrorMessage('Data Kepala Sekolah belum diimpor. Silakan login sebagai Admin dan lakukan import Excel data guru.');
+                    }
+                  }}
+                  className="p-2.5 border border-emerald-200 bg-emerald-50/40 hover:bg-emerald-100 hover:border-emerald-400 rounded-xl text-left transition-all cursor-pointer group"
                 >
                   <div className="flex items-center justify-between">
                     <span className="text-[11px] font-bold text-emerald-950 group-hover:text-emerald-700">
                       2. Kepala Sekolah
                     </span>
-                    <span className="text-[9px] font-mono px-1.5 py-0.2 rounded bg-emerald-200/80 text-emerald-900 font-bold">
-                      Eksekutif
+                    <span className={`text-[9px] font-mono px-1.5 py-0.5 rounded font-bold ${
+                      teachers.some((t) => t.role === 'kepala_sekolah')
+                        ? 'bg-emerald-200/80 text-emerald-900'
+                        : 'bg-slate-200 text-slate-600'
+                    }`}>
+                      {teachers.some((t) => t.role === 'kepala_sekolah') ? 'Aktif' : 'Menunggu Import'}
                     </span>
                   </div>
-                  <p className="text-[10px] text-slate-500 mt-0.5">Pemantau laporan realtime sekolah</p>
+                  <p className="text-[10px] text-slate-500 mt-0.5">Pemantauan & Laporan Realtime</p>
                 </button>
               </div>
 
@@ -208,74 +259,39 @@ export const LoginView: React.FC = () => {
                       (Pilihan Hak Akses: Guru Mapel, Wali Kelas, & Guru BK)
                     </span>
                   </span>
+                  <span className={`text-[9px] font-mono px-1.5 py-0.5 rounded font-bold ${
+                    otherTeachers.length > 0 ? 'bg-blue-200 text-blue-900' : 'bg-slate-200 text-slate-600'
+                  }`}>
+                    {otherTeachers.length > 0 ? `${otherTeachers.length} Guru Terdeteksi` : 'Menunggu Import'}
+                  </span>
                 </div>
-                <p className="text-[10px] text-slate-600 leading-relaxed">
-                  Hak akses otomatis terdeteksi dari data master: merangkap 2 atau 3 jabatan menampilkan portal sesuai jabatannya.
-                </p>
 
-                <div className="grid grid-cols-2 sm:grid-cols-3 gap-1.5 pt-1">
-                  <button
-                    type="button"
-                    onClick={() => handleQuickLogin('guru.nurulfaizah')}
-                    className="p-2 bg-white border border-slate-200 hover:border-blue-500 hover:bg-blue-50/60 rounded-lg text-left transition-colors cursor-pointer group"
-                  >
-                    <p className="text-[11px] font-bold text-slate-800 group-hover:text-blue-700 truncate">
-                      Guru Mapel Murni
+                {otherTeachers.length === 0 ? (
+                  <div className="p-2.5 bg-white/80 rounded-lg border border-blue-100 text-[11px] text-slate-600 flex items-start gap-2">
+                    <Upload className="w-4 h-4 text-blue-600 shrink-0 mt-0.5" />
+                    <p>
+                      Seluruh data guru saat ini kosong untuk memberi ruang pengujian import data demo Anda. Setelah Anda mengimpor data guru di menu Admin, tombol login cepat untuk guru mapel, wali kelas, dan BK akan otomatis muncul di sini.
                     </p>
-                    <p className="text-[9px] text-slate-500 font-mono truncate">1 Peran: Mapel IPA</p>
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => handleQuickLogin('guru.sitirahmawati')}
-                    className="p-2 bg-white border border-slate-200 hover:border-indigo-500 hover:bg-indigo-50/60 rounded-lg text-left transition-colors cursor-pointer group"
-                  >
-                    <p className="text-[11px] font-bold text-slate-800 group-hover:text-indigo-700 truncate">
-                      Guru Mapel + Walas
-                    </p>
-                    <p className="text-[9px] text-indigo-600 font-mono truncate">2 Peran: Mapel & Wali 7A</p>
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => handleQuickLogin('guru.bambangbk')}
-                    className="p-2 bg-white border border-slate-200 hover:border-rose-500 hover:bg-rose-50/60 rounded-lg text-left transition-colors cursor-pointer group"
-                  >
-                    <p className="text-[11px] font-bold text-slate-800 group-hover:text-rose-700 truncate">
-                      Guru BK (Konselor)
-                    </p>
-                    <p className="text-[9px] text-rose-600 font-mono truncate">1 Peran: Guru BK Murni</p>
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => handleQuickLogin('guru.sitiaminahbk')}
-                    className="p-2 bg-white border border-slate-200 hover:border-amber-500 hover:bg-amber-50/60 rounded-lg text-left transition-colors cursor-pointer group"
-                  >
-                    <p className="text-[11px] font-bold text-slate-800 group-hover:text-amber-700 truncate">
-                      Guru BK & Mengajar
-                    </p>
-                    <p className="text-[9px] text-amber-600 font-mono truncate">2 Peran: BK + Mapel</p>
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => handleQuickLogin('guru.multiperan')}
-                    className="p-2 bg-white border border-indigo-300 hover:border-indigo-600 hover:bg-indigo-50 rounded-lg text-left transition-colors cursor-pointer group col-span-2 sm:col-span-2"
-                  >
-                    <div className="flex items-center justify-between">
-                      <p className="text-[11px] font-bold text-indigo-900 group-hover:text-indigo-700 truncate">
-                        Guru Merangkap 3 Jabatan
-                      </p>
-                      <span className="text-[9px] bg-indigo-100 text-indigo-800 font-bold px-1.5 rounded">
-                        Lengkap
-                      </span>
-                    </div>
-                    <p className="text-[9px] text-slate-600 font-mono truncate">
-                      3 Peran Terdeteksi: Guru Mapel, Wali Kelas (9F), & Guru BK
-                    </p>
-                  </button>
-                </div>
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-1.5 pt-1">
+                    {otherTeachers.slice(0, 6).map((tch) => (
+                      <button
+                        key={tch.id}
+                        type="button"
+                        onClick={() => handleQuickLogin(tch.username, 'admin123')}
+                        className="p-2 bg-white border border-slate-200 hover:border-blue-500 hover:bg-blue-50/60 rounded-lg text-left transition-colors cursor-pointer group"
+                      >
+                        <p className="text-[11px] font-bold text-slate-800 group-hover:text-blue-700 truncate">
+                          {tch.name}
+                        </p>
+                        <p className="text-[9px] text-slate-500 font-mono truncate">
+                          {tch.classId ? `Wali ${tch.classId}` : tch.role === 'guru_bk' ? 'Guru BK' : 'Guru Mapel'}
+                        </p>
+                      </button>
+                    ))}
+                  </div>
+                )}
               </div>
             </div>
           </div>

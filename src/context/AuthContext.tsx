@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { UserAccount, UserRole } from '../types';
-import { SchoolStorage } from '../utils/storage';
+import { SchoolStorage, ADMIN_USER } from '../utils/storage';
 
 interface AuthContextType {
   currentUser: UserAccount | null;
@@ -26,7 +26,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       const saved = localStorage.getItem('SIMANTAP_LMS_users');
       if (saved) return JSON.parse(saved);
     } catch {}
-    return SchoolStorage.getDefaultUsers();
+    return [ADMIN_USER];
   });
 
   const [currentUser, setCurrentUser] = useState<UserAccount | null>(() => {
@@ -34,7 +34,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       const savedUser = localStorage.getItem('SIMANTAP_LMS_currentUser');
       if (savedUser) return JSON.parse(savedUser);
     } catch {}
-    return SchoolStorage.getDefaultUsers()[0];
+    return ADMIN_USER;
   });
 
   const [activeRole, setActiveRole] = useState<UserRole>(() => {
@@ -71,6 +71,30 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const login = (username: string, _password?: string) => {
     const trimmed = username.trim().toLowerCase();
+
+    // Dedicated handler for Admin Operator testing account
+    if (trimmed === 'admin') {
+      if (_password && _password !== 'admin123') {
+        return { success: false, message: 'Password salah untuk akun admin. Password yang benar: admin123' };
+      }
+      const adminAcc: UserAccount = {
+        ...ADMIN_USER,
+        lastLogin: new Date().toISOString(),
+      };
+      setCurrentUser(adminAcc);
+      setActiveRole('admin_operator');
+      setShowPortalSelector(false);
+      localStorage.setItem('SIMANTAP_LMS_currentUser', JSON.stringify(adminAcc));
+      SchoolStorage.logActivity(
+        adminAcc.name,
+        adminAcc.role,
+        'Login Berhasil',
+        'Master',
+        'Admin berhasil masuk ke sistem dengan password admin123.'
+      );
+      return { success: true };
+    }
+
     let user = allUsers.find(
       (u) => u.username.toLowerCase() === trimmed || (u.email && u.email.toLowerCase() === trimmed)
     );

@@ -18,7 +18,7 @@ import {
   WaliKelasImportRow,
   UserRole,
 } from '../types';
-import { SchoolStorage, CLASS_IDS } from '../utils/storage';
+import { SchoolStorage, CLASS_IDS, ADMIN_TEACHER } from '../utils/storage';
 import { useAuth } from './AuthContext';
 
 interface ScheduleConflict {
@@ -115,6 +115,7 @@ interface SchoolContextType {
 
   activityLogs: ActivityLog[];
   logAction: (action: string, category: any, details: string) => void;
+  clearAllExceptAdmin: () => void;
 }
 
 const SchoolContext = createContext<SchoolContextType | undefined>(undefined);
@@ -264,6 +265,28 @@ export const SchoolProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
     if (toAdd.length > 0) {
       setStudents((prev) => [...prev, ...toAdd]);
+
+      // Automatically register any new class IDs encountered during import
+      const referencedClasses = Array.from(new Set(toAdd.map((s) => s.classId)));
+      setClasses((prev) => {
+        const existingClassMap = new Set(prev.map((c) => c.classId));
+        const missingClasses: ClassRoom[] = referencedClasses
+          .filter((cid) => !existingClassMap.has(cid))
+          .map((cid) => {
+            const gradeChar = cid.charAt(0);
+            const gradeLevel: '7' | '8' | '9' = gradeChar === '7' || gradeChar === '8' || gradeChar === '9' ? gradeChar : '7';
+            return {
+              classId: cid,
+              name: `Kelas ${cid}`,
+              gradeLevel,
+              studentCount: toAdd.filter((s) => s.classId === cid).length,
+              academicYear: settings.activeAcademicYear || '2026/2027',
+              status: 'Aktif',
+            };
+          });
+        return [...prev, ...missingClasses];
+      });
+
       logAction('Import Siswa Excel Massal', 'Import', `Berhasil mengimpor ${added} data siswa baru.`);
     }
     return { added, skipped: newStudents.length - added };
@@ -1178,9 +1201,27 @@ export const SchoolProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     ).length;
   }, [notifications, activeRole]);
 
+  const clearAllExceptAdmin = () => {
+    SchoolStorage.clearAllDataExceptAdmin();
+    setStudents([]);
+    setTeachers([ADMIN_TEACHER]);
+    setClasses([]);
+    setSubjects([]);
+    setSchedules([]);
+    setAttendanceSessions([]);
+    setGrades([]);
+    setViolations([]);
+    setDailyScores([]);
+    setCounselingRecords([]);
+    setAttitudes([]);
+    setNotifications([]);
+    setActivityLogs(SchoolStorage.getActivityLogs());
+  };
+
   return (
     <SchoolContext.Provider
       value={{
+        clearAllExceptAdmin,
         settings,
         updateSettings,
         students,
