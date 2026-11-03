@@ -207,6 +207,22 @@ export const AdminDashboard: React.FC<{ onNavigate: (menuId: string) => void }> 
           <p className="text-xs text-slate-500 mb-4">Navigasi langsung ke modul utama operator</p>
 
           <button
+            onClick={() => onNavigate('admin_bk_assignment')}
+            className="w-full p-3 rounded-lg border border-emerald-200 bg-emerald-50/50 hover:border-emerald-500 hover:bg-emerald-50 text-left transition-colors flex items-center justify-between text-xs group"
+          >
+            <div className="flex items-center gap-2.5">
+              <ShieldCheck className="w-4 h-4 text-emerald-600" />
+              <div>
+                <span className="font-semibold text-emerald-900 block group-hover:text-emerald-700">
+                  Pembagian Siswa BK & Rombel
+                </span>
+                <span className="text-[10px] text-emerald-600">Plotting rombel & import Excel BK</span>
+              </div>
+            </div>
+            <ArrowRight className="w-4 h-4 text-emerald-500 group-hover:text-emerald-700" />
+          </button>
+
+          <button
             onClick={() => onNavigate('import_excel')}
             className="w-full p-3 rounded-lg border border-slate-200 hover:border-blue-500 hover:bg-blue-50/40 text-left transition-colors flex items-center justify-between text-xs group"
           >

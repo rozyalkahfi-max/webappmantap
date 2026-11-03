@@ -55,7 +55,11 @@ export const Sidebar: React.FC<SidebarProps> = ({
   onClose,
 }) => {
   const { currentUser, activeRole, switchRole } = useAuth();
-  const { priorityBkStudents, unreadNotificationCount, students, teachers, classes, subjects } = useSchool();
+  const { priorityBkStudents, unreadNotificationCount, students, teachers, classes, subjects, getBKAssignedStudents } = useSchool();
+
+  // Scoped BK priority count
+  const myBkStudentIds = new Set(getBKAssignedStudents(currentUser?.id || currentUser?.name || '').map((s) => s.id));
+  const myPriorityCount = priorityBkStudents.filter((p) => myBkStudentIds.size === 0 || myBkStudentIds.has(p.student.id)).length;
 
   const getMenuSections = (): MenuSection[] => {
     switch (activeRole) {
@@ -78,6 +82,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
           {
             title: 'Pengelolaan',
             items: [
+              { id: 'admin_bk_assignment', label: 'Pembagian Siswa BK', icon: ShieldAlert, badge: 'Khusus BK', badgeColor: 'bg-emerald-600 text-white' },
               { id: 'import_excel', label: 'Import Excel Massal', icon: FileSpreadsheet },
               { id: 'schedule', label: 'Jadwal Pembelajaran', icon: CalendarDays },
               { id: 'users', label: 'Manajemen Pengguna', icon: UserCog },
@@ -179,7 +184,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 id: 'bk_priority',
                 label: 'Siswa Prioritas (>30 Poin)',
                 icon: ShieldAlert,
-                badge: priorityBkStudents.length,
+                badge: myPriorityCount,
                 badgeColor: 'bg-rose-600 text-white font-bold',
               },
             ],

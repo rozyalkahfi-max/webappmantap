@@ -24,6 +24,7 @@ import {
   generateSubjectTemplate,
   generateViolationRuleTemplate,
   generateWaliKelasTemplate,
+  generateBKAssignmentTemplate,
   parseExcelFile,
   validateStudentsImport,
   validateTeachersImport,
@@ -32,6 +33,7 @@ import {
   validateSubjectsImport,
   validateViolationRulesImport,
   validateWaliKelasImport,
+  validateBKAssignmentImport,
   downloadErrorReport,
   ValidationSummary,
 } from '../../utils/excel';
@@ -51,13 +53,14 @@ export const ExcelImportView: React.FC = () => {
     importSubjectsBatch,
     importViolationRulesBatch,
     importWaliKelasBatch,
+    importBKAssignmentsBatch,
     clearAllExceptAdmin,
   } = useSchool();
 
   const { activeRole } = useAuth();
   const isAdmin = activeRole === 'admin_operator';
 
-  type ImportTab = 'siswa' | 'guru' | 'wali_kelas' | 'kelas' | 'jadwal' | 'mapel' | 'pelanggaran';
+  type ImportTab = 'siswa' | 'guru' | 'wali_kelas' | 'bk_assignment' | 'kelas' | 'jadwal' | 'mapel' | 'pelanggaran';
   const [activeTab, setActiveTab] = useState<ImportTab>('siswa');
   const [file, setFile] = useState<File | null>(null);
   const [validationResult, setValidationResult] = useState<ValidationSummary<any> | null>(null);
@@ -89,6 +92,9 @@ export const ExcelImportView: React.FC = () => {
       case 'pelanggaran':
         generateViolationRuleTemplate();
         break;
+      case 'bk_assignment':
+        generateBKAssignmentTemplate();
+        break;
     }
   };
 
@@ -111,6 +117,9 @@ export const ExcelImportView: React.FC = () => {
         setValidationResult(val);
       } else if (activeTab === 'wali_kelas') {
         const val = validateWaliKelasImport(rawRows, teachers, classes);
+        setValidationResult(val);
+      } else if (activeTab === 'bk_assignment') {
+        const val = validateBKAssignmentImport(rawRows, teachers, availableClassIds, students);
         setValidationResult(val);
       } else if (activeTab === 'kelas') {
         const val = validateClassesImport(rawRows, classes);
@@ -153,6 +162,11 @@ export const ExcelImportView: React.FC = () => {
       const res = importWaliKelasBatch(validItems);
       setImportSuccessMessage(
         `Berhasil mengimpor data penugasan Wali Kelas: ${res.total} penugasan diproses. Akun guru otomatis berstatus Wali Kelas & sinkron ke data rombel kelas!`
+      );
+    } else if (activeTab === 'bk_assignment') {
+      const res = importBKAssignmentsBatch(validItems);
+      setImportSuccessMessage(
+        `Berhasil mengimpor ${res.total} data siswa & rombel binaan Guru BK! Data langsung terdistribusi ke masing-masing Guru BK.`
       );
     } else if (activeTab === 'kelas') {
       const res = importClassesBatch(validItems);
@@ -319,6 +333,23 @@ export const ExcelImportView: React.FC = () => {
 
         <button
           onClick={() => {
+            setActiveTab('bk_assignment');
+            setValidationResult(null);
+            setFile(null);
+            setImportSuccessMessage(null);
+          }}
+          className={`flex items-center gap-2 px-4 py-2.5 text-xs font-semibold border-b-2 transition-colors cursor-pointer shrink-0 ${
+            activeTab === 'bk_assignment'
+              ? 'border-emerald-600 text-emerald-700 bg-emerald-50/50 rounded-t-lg'
+              : 'border-transparent text-slate-600 hover:text-slate-900'
+          }`}
+        >
+          <ShieldAlert className="w-4 h-4 text-emerald-600" />
+          <span>Import Siswa Guru BK</span>
+        </button>
+
+        <button
+          onClick={() => {
             setActiveTab('kelas');
             setValidationResult(null);
             setFile(null);
@@ -403,6 +434,7 @@ export const ExcelImportView: React.FC = () => {
           {activeTab === 'siswa' && 'Format Kolom: No | ID | NIS | NISN | Nama | Kelas'}
           {activeTab === 'guru' && 'Format Kolom: Username | Password | NIP | Nama | Jabatan | Mata Pelajaran | Wali Kelas'}
           {activeTab === 'wali_kelas' && 'Format Kolom: Username | Password | Kelas ID | Tahun Ajaran'}
+          {activeTab === 'bk_assignment' && 'Format Kolom: No | Nama Siswa | Kelas | Guru BK'}
           {activeTab === 'kelas' && 'Format Kolom: Kelas | Tingkat | Tahun Ajaran'}
           {activeTab === 'jadwal' && 'Format Kolom: No | Nama Guru | Kode Guru | Mata Pelajaran | Kelas | Hari | Jam Ke- | Pukul'}
           {activeTab === 'mapel' && 'Format Kolom: Id Mapel | Nama Mapel | Jam Mapel Per Minggu'}
@@ -412,6 +444,7 @@ export const ExcelImportView: React.FC = () => {
           {activeTab === 'siswa' && 'Mendukung data siswa untuk rombel kelas 7A s/d 9H. Sistem akan memverifikasi duplikasi NIS dan kelas rombel.'}
           {activeTab === 'guru' && 'Format baru mencakup NIP dan kolom Wali Kelas. Ketika guru diimpor dan ditugaskan di kolom Wali Kelas (misal 7A), nama guru otomatis muncul sebagai Wali Kelas di menu Data Master Kelas!'}
           {activeTab === 'wali_kelas' && 'Import khusus data penugasan Wali Kelas: format baris mencakup Username, Password, Kelas ID (7A–9H), dan Tahun Ajaran. Sistem otomatis menghubungkan akun guru dengan rombel binaan, mengaktifkan hak akses Wali Kelas, dan memisahkan portal login masuk Guru Mapel vs Wali Kelas.'}
+          {activeTab === 'bk_assignment' && 'Import khusus pembagian siswa & rombel binaan Guru BK (format: Nama Siswa, Kelas, Guru BK). Mengalokasikan tanggung jawab bimbingan secara fleksibel (per rombel misal 7A–7F ke Guru A, atau per nama siswa). Laporan pelanggaran siswa langsung terhubung ke akun Guru BK terkait!'}
           {activeTab === 'kelas' && 'Import massal rombongan belajar dengan spesifikasi: Kelas (contoh 7A, 8B, 9C), Tingkat (7, 8, atau 9), dan Tahun Ajaran (contoh 2026/2027).'}
           {activeTab === 'jadwal' && 'Jadwal langsung terhubung ke akun guru pengajar masing-masing. Ketika guru mapel login pada hari terkait (misal Senin), jadwal dan absensi otomatis muncul di dashboard mereka. Sistem melakukan pencegahan bentrok guru dan bentrok kelas.'}
           {activeTab === 'mapel' && 'Format ringkas Kurikulum Merdeka tanpa kelompok kurikulum dan tanpa KKM. Cukup sediakan Id Mapel (misal: MAT, BIN), Nama Mapel, dan Jam Mapel Per Minggu (JP).'}

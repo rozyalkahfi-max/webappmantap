@@ -30,6 +30,7 @@ import { KepsekRealtimeReportsView } from './components/views/KepsekRealtimeRepo
 import { AcademicAnalyticsView } from './components/views/AcademicAnalyticsView';
 import { WaliAttendanceView } from './components/views/WaliAttendanceView';
 import { WaliClassReportsView } from './components/views/WaliClassReportsView';
+import { AdminBKAssignmentView } from './components/views/AdminBKAssignmentView';
 import { PortalSelectionModal } from './components/common/PortalSelectionModal';
 import { MobileBottomNav } from './components/common/MobileBottomNav';
 
@@ -129,6 +130,13 @@ const MainLayout: React.FC = () => {
         return <ClassMasterView onNavigate={setCurrentMenu} />;
       case 'subjects':
         return <SubjectMasterView />;
+
+      // BK Student Assignment & Import - Strictly Admin Operator Only
+      case 'admin_bk_assignment':
+        if (activeRole !== 'admin_operator') {
+          return <AdminDashboard onNavigate={setCurrentMenu} />;
+        }
+        return <AdminBKAssignmentView />;
 
       // Excel Mass Import - Strictly Admin Operator Only (Requirement 10)
       case 'import_excel':

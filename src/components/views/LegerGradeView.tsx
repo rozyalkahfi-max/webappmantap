@@ -9,14 +9,22 @@ export const LegerGradeView: React.FC = () => {
   const { students, classes, subjects, grades, settings } = useSchool();
   const { currentUser, activeRole } = useAuth();
 
-  // If user is wali_kelas, default to their class
-  const defaultClass =
-    activeRole === 'wali_kelas' && currentUser?.classId
-      ? currentUser.classId
-      : classes[0]?.classId || '7A';
+  // Requirement 2: Lock strictly to homeroom class for Wali Kelas
+  const walasClassId = React.useMemo(() => {
+    return currentUser?.classId || classes.find((c) => c.homeroomTeacherId === currentUser?.teacherCode)?.classId || '7A';
+  }, [currentUser, classes]);
+
+  const defaultClass = activeRole === 'wali_kelas' ? walasClassId : (classes[0]?.classId || '7A');
 
   const [selectedClass, setSelectedClass] = useState<string>(defaultClass);
   const [isPrintModalOpen, setIsPrintModalOpen] = useState(false);
+
+  // Sync selectedClass if activeRole is wali_kelas
+  React.useEffect(() => {
+    if (activeRole === 'wali_kelas' && selectedClass !== walasClassId) {
+      setSelectedClass(walasClassId);
+    }
+  }, [activeRole, walasClassId, selectedClass]);
 
   const currentClassRoom = classes.find((c) => c.classId === selectedClass);
   const classStudents = students.filter((s) => s.classId === selectedClass);
@@ -127,22 +135,30 @@ export const LegerGradeView: React.FC = () => {
       {/* Class Selector Bar */}
       <div className="bg-white border border-slate-200 rounded-xl p-4 shadow-xs flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-3">
-          <div>
-            <label className="block text-[10px] font-semibold text-slate-500 uppercase tracking-wider mb-1">
-              Pilih Rombel / Kelas
-            </label>
-            <select
-              value={selectedClass}
-              onChange={(e) => setSelectedClass(e.target.value)}
-              className="bg-slate-50 border border-slate-200 rounded px-3 py-1.5 text-xs font-bold text-blue-700 focus:outline-none focus:ring-1 focus:ring-blue-600"
-            >
-              {classes.map((c) => (
-                <option key={c.classId} value={c.classId}>
-                  {c.classId} · {c.studentCount} Siswa
-                </option>
-              ))}
-            </select>
-          </div>
+          {activeRole === 'wali_kelas' ? (
+            <div className="bg-blue-50 border border-blue-200 px-3 py-1.5 rounded-lg text-xs font-semibold text-blue-900 flex items-center gap-2">
+              <span className="text-[11px] uppercase tracking-wider text-blue-600 font-bold">Kelas Binaan Anda:</span>
+              <span className="bg-blue-600 text-white font-mono font-bold px-2 py-0.5 rounded text-xs">{walasClassId}</span>
+              <span className="text-slate-500 font-normal">({classStudents.length} Siswa)</span>
+            </div>
+          ) : (
+            <div>
+              <label className="block text-[10px] font-semibold text-slate-500 uppercase tracking-wider mb-1">
+                Pilih Rombel / Kelas
+              </label>
+              <select
+                value={selectedClass}
+                onChange={(e) => setSelectedClass(e.target.value)}
+                className="bg-slate-50 border border-slate-200 rounded px-3 py-1.5 text-xs font-bold text-blue-700 focus:outline-none focus:ring-1 focus:ring-blue-600"
+              >
+                {classes.map((c) => (
+                  <option key={c.classId} value={c.classId}>
+                    {c.classId} · {c.studentCount} Siswa
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
 
           <div className="pl-4 border-l border-slate-200 text-xs">
             <span className="text-slate-500">Wali Kelas:</span>{' '}

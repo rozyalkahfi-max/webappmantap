@@ -14,6 +14,7 @@ import {
   Filter,
 } from 'lucide-react';
 import { useSchool } from '../../context/SchoolContext';
+import { useAuth } from '../../context/AuthContext';
 import { DataTable, ColumnDef } from '../common/DataTable';
 import { Student } from '../../types';
 
@@ -29,6 +30,13 @@ export const StudentMasterView: React.FC = () => {
     deleteAllStudents,
     resetDefaultStudents,
   } = useSchool();
+  const { currentUser, activeRole } = useAuth();
+
+  // Requirement 2: Wali Kelas strictly sees only students from their homeroom class
+  const isWalas = activeRole === 'wali_kelas';
+  const walasClassId = useMemo(() => {
+    return currentUser?.classId || classes.find((c) => c.homeroomTeacherId === currentUser?.teacherCode)?.classId || '7A';
+  }, [currentUser, classes]);
 
   const [selectedClass, setSelectedClass] = useState<string>('ALL');
   const [selectedGrade, setSelectedGrade] = useState<string>('ALL');
@@ -58,19 +66,22 @@ export const StudentMasterView: React.FC = () => {
     nis: '',
     nisn: '',
     name: '',
-    classId: '7A',
+    classId: isWalas ? walasClassId : '7A',
     gender: 'L' as 'L' | 'P',
     status: 'Aktif' as 'Aktif' | 'Mutasi' | 'Lulus' | 'Nonaktif',
   });
 
-  // Filter students by selected Class & Grade
+  // Filter students by selected Class & Grade (or strictly walasClassId for Wali Kelas)
   const filteredStudents = useMemo(() => {
+    if (isWalas) {
+      return students.filter((s) => s.classId === walasClassId);
+    }
     return students.filter((s) => {
       if (selectedClass !== 'ALL' && s.classId !== selectedClass) return false;
       if (selectedGrade !== 'ALL' && !s.classId.startsWith(selectedGrade)) return false;
       return true;
     });
-  }, [students, selectedClass, selectedGrade]);
+  }, [students, isWalas, walasClassId, selectedClass, selectedGrade]);
 
   // Statistics per grade
   const grade7Count = useMemo(() => students.filter((s) => s.classId.startsWith('7')).length, [students]);
@@ -264,94 +275,106 @@ export const StudentMasterView: React.FC = () => {
     setIsModalOpen(false);
   };
 
-  // Columns definition with row checkbox
-  const columns: ColumnDef<Student>[] = [
-    {
-      key: 'select',
-      header: '',
-      sortable: false,
-      align: 'center',
-      width: '44px',
-      render: (s) => (
-        <input
-          type="checkbox"
-          checked={selectedStudentIds.has(s.id)}
-          onChange={() => toggleSelectStudent(s.id)}
-          aria-label={`Pilih ${s.name}`}
-          className="w-4 h-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
-        />
-      ),
-    },
-    { key: 'id', header: 'ID Siswa', sortable: true, width: '90px' },
-    { key: 'nis', header: 'NIS', sortable: true, width: '80px' },
-    { key: 'nisn', header: 'NISN', sortable: true, width: '110px' },
-    {
-      key: 'name',
-      header: 'Nama Lengkap Siswa',
-      sortable: true,
-      render: (s) => (
-        <div>
-          <span className="font-semibold text-slate-900 block">{s.name}</span>
-          <span className="text-[10px] text-slate-400 font-mono">
-            {s.gender === 'L' ? 'Laki-Laki' : 'Perempuan'}
+  // Columns definition with row checkbox (omitted for Wali Kelas)
+  const columns: ColumnDef<Student>[] = useMemo(() => {
+    const cols: ColumnDef<Student>[] = [];
+
+    if (!isWalas) {
+      cols.push({
+        key: 'select',
+        header: '',
+        sortable: false,
+        align: 'center',
+        width: '44px',
+        render: (s) => (
+          <input
+            type="checkbox"
+            checked={selectedStudentIds.has(s.id)}
+            onChange={() => toggleSelectStudent(s.id)}
+            aria-label={`Pilih ${s.name}`}
+            className="w-4 h-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
+          />
+        ),
+      });
+    }
+
+    cols.push(
+      { key: 'id', header: 'ID Siswa', sortable: true, width: '90px' },
+      { key: 'nis', header: 'NIS', sortable: true, width: '80px' },
+      { key: 'nisn', header: 'NISN', sortable: true, width: '110px' },
+      {
+        key: 'name',
+        header: 'Nama Lengkap Siswa',
+        sortable: true,
+        render: (s) => (
+          <div>
+            <span className="font-semibold text-slate-900 block">{s.name}</span>
+            <span className="text-[10px] text-slate-400 font-mono">
+              {s.gender === 'L' ? 'Laki-Laki' : 'Perempuan'}
+            </span>
+          </div>
+        ),
+      },
+      {
+        key: 'classId',
+        header: 'Kelas',
+        sortable: true,
+        align: 'center',
+        width: '80px',
+        render: (s) => (
+          <span className="font-bold text-blue-700 bg-blue-50 px-2 py-0.5 rounded border border-blue-200">
+            {s.classId}
           </span>
-        </div>
-      ),
-    },
-    {
-      key: 'classId',
-      header: 'Kelas',
-      sortable: true,
-      align: 'center',
-      width: '80px',
-      render: (s) => (
-        <span className="font-bold text-blue-700 bg-blue-50 px-2 py-0.5 rounded border border-blue-200">
-          {s.classId}
-        </span>
-      ),
-    },
-    {
-      key: 'status',
-      header: 'Status',
-      sortable: true,
-      align: 'center',
-      width: '90px',
-      render: (s) => (
-        <span
-          className={`text-[11px] font-semibold ${
-            s.status === 'Aktif' ? 'text-emerald-700' : 'text-slate-500'
-          }`}
-        >
-          {s.status}
-        </span>
-      ),
-    },
-    {
-      key: 'actions',
-      header: 'Aksi',
-      sortable: false,
-      align: 'right',
-      width: '90px',
-      render: (s) => (
-        <div className="flex items-center justify-end gap-1">
-          <button
-            onClick={() => handleOpenEdit(s)}
-            className="p-1.5 text-slate-500 hover:text-blue-600 hover:bg-blue-50 rounded transition-colors cursor-pointer"
-            title="Edit Siswa"
+        ),
+      },
+      {
+        key: 'status',
+        header: 'Status',
+        sortable: true,
+        align: 'center',
+        width: '90px',
+        render: (s) => (
+          <span
+            className={`text-[11px] font-semibold ${
+              s.status === 'Aktif' ? 'text-emerald-700' : 'text-slate-500'
+            }`}
           >
-            <Edit2 className="w-3.5 h-3.5" />
-          </button>
-          <button
-            onClick={() => handleDeleteSingle(s)}
-            className="p-1.5 text-slate-500 hover:text-rose-600 hover:bg-rose-50 rounded transition-colors cursor-pointer"
-            title="Hapus Satu Siswa"
-          >
-            <Trash2 className="w-3.5 h-3.5" />
-          </button>
-        </div>
-      ),
-    },
-  ];
+            {s.status}
+          </span>
+        ),
+      }
+    );
+
+    if (!isWalas) {
+      cols.push({
+        key: 'actions',
+        header: 'Aksi',
+        sortable: false,
+        align: 'right',
+        width: '90px',
+        render: (s) => (
+          <div className="flex items-center justify-end gap-1">
+            <button
+              onClick={() => handleOpenEdit(s)}
+              className="p-1.5 text-slate-500 hover:text-blue-600 hover:bg-blue-50 rounded transition-colors cursor-pointer"
+              title="Edit Siswa"
+            >
+              <Edit2 className="w-3.5 h-3.5" />
+            </button>
+            <button
+              onClick={() => handleDeleteSingle(s)}
+              className="p-1.5 text-slate-500 hover:text-rose-600 hover:bg-rose-50 rounded transition-colors cursor-pointer"
+              title="Hapus Satu Siswa"
+            >
+              <Trash2 className="w-3.5 h-3.5" />
+            </button>
+          </div>
+        ),
+      });
+    }
+
+    return cols;
+  }, [isWalas, selectedStudentIds]);
 
   const allFilteredSelected =
     filteredStudents.length > 0 &&
@@ -371,191 +394,210 @@ export const StudentMasterView: React.FC = () => {
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
           <h2 className="text-xl font-bold text-slate-900 tracking-tight">
-            Data Master Siswa
+            {isWalas ? `Data Siswa Binaan Kelas ${walasClassId}` : 'Data Master Siswa'}
           </h2>
           <p className="text-xs text-slate-500 mt-0.5">
-            Total <strong className="text-slate-800 font-mono">{students.length}</strong> siswa terdaftar di {classes.length} rombel
-            (Kelas 7: {grade7Count} siswa · Kelas 8: {grade8Count} siswa · Kelas 9: {grade9Count} siswa)
+            {isWalas
+              ? `Daftar resmi peserta didik binaan Anda di Kelas ${walasClassId} (${filteredStudents.length} siswa).`
+              : `Total ${students.length} siswa terdaftar di ${classes.length} rombel (Kelas 7: ${grade7Count} siswa · Kelas 8: ${grade8Count} siswa · Kelas 9: ${grade9Count} siswa)`}
           </p>
         </div>
 
-        <div className="flex items-center gap-2 shrink-0">
-          <button
-            onClick={handleResetDefault}
-            className="flex items-center gap-1.5 px-3 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-xs font-semibold transition-colors cursor-pointer"
-            title="Pulihkan data siswa bawaan (708 siswa)"
-          >
-            <RotateCcw className="w-3.5 h-3.5 text-slate-500" />
-            <span>Pulihkan 708 Siswa</span>
-          </button>
-
-          <button
-            onClick={handleOpenAdd}
-            className="flex items-center gap-1.5 px-3.5 py-2 bg-blue-700 hover:bg-blue-800 text-white rounded-lg text-xs font-semibold shadow-xs transition-colors cursor-pointer"
-          >
-            <Plus className="w-4 h-4" />
-            <span>Tambah Siswa</span>
-          </button>
-        </div>
-      </div>
-
-      {/* Quick Mark & Auto Delete Toolbar */}
-      <div className="bg-slate-50 border border-slate-200 rounded-xl p-3.5 space-y-3">
-        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3">
-          {/* Quick Mark Buttons for Grade 7, 8, 9 */}
-          <div className="flex flex-wrap items-center gap-2">
-            <span className="text-xs font-bold text-slate-700 mr-1 flex items-center gap-1">
-              <CheckSquare className="w-3.5 h-3.5 text-blue-600" />
-              Tandai Cepat:
-            </span>
-
+        {!isWalas && (
+          <div className="flex items-center gap-2 shrink-0">
             <button
-              onClick={() => handleSelectGrade('7')}
-              className="px-3 py-1.5 bg-white border border-slate-300 hover:border-blue-500 hover:bg-blue-50/50 text-slate-800 rounded-lg text-xs font-semibold transition-all shadow-2xs cursor-pointer"
+              onClick={handleResetDefault}
+              className="flex items-center gap-1.5 px-3 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-xs font-semibold transition-colors cursor-pointer"
+              title="Pulihkan data siswa bawaan (708 siswa)"
             >
-              Semua Kelas 7 ({grade7Count})
+              <RotateCcw className="w-3.5 h-3.5 text-slate-500" />
+              <span>Pulihkan 708 Siswa</span>
             </button>
 
             <button
-              onClick={() => handleSelectGrade('8')}
-              className="px-3 py-1.5 bg-white border border-slate-300 hover:border-blue-500 hover:bg-blue-50/50 text-slate-800 rounded-lg text-xs font-semibold transition-all shadow-2xs cursor-pointer"
+              onClick={handleOpenAdd}
+              className="flex items-center gap-1.5 px-3.5 py-2 bg-blue-700 hover:bg-blue-800 text-white rounded-lg text-xs font-semibold shadow-xs transition-colors cursor-pointer"
             >
-              Semua Kelas 8 ({grade8Count})
+              <Plus className="w-4 h-4" />
+              <span>Tambah Siswa</span>
             </button>
-
-            <button
-              onClick={() => handleSelectGrade('9')}
-              className="px-3 py-1.5 bg-white border border-slate-300 hover:border-blue-500 hover:bg-blue-50/50 text-slate-800 rounded-lg text-xs font-semibold transition-all shadow-2xs cursor-pointer"
-            >
-              Semua Kelas 9 ({grade9Count})
-            </button>
-
-            <button
-              onClick={handleSelectAllFiltered}
-              className="px-3 py-1.5 bg-white border border-slate-300 hover:border-slate-400 text-slate-700 rounded-lg text-xs font-medium transition-colors cursor-pointer shadow-2xs"
-            >
-              {allFilteredSelected ? 'Batalkan Filter Ini' : `Tandai Tampilan (${filteredStudents.length})`}
-            </button>
-
-            {selectedStudentIds.size > 0 && (
-              <button
-                onClick={handleClearSelection}
-                className="px-2.5 py-1.5 text-xs text-slate-500 hover:text-slate-800 font-medium underline cursor-pointer"
-              >
-                Kosongkan Pilihan
-              </button>
-            )}
-          </div>
-
-          {/* Direct Grade Deletion Buttons */}
-          <div className="flex flex-wrap items-center gap-2 border-t lg:border-t-0 pt-2 lg:pt-0">
-            <span className="text-xs font-bold text-rose-700 mr-1 flex items-center gap-1">
-              <Trash2 className="w-3.5 h-3.5 text-rose-600" />
-              Hapus Massal Langsung:
-            </span>
-
-            <button
-              onClick={() => handleDeleteByGradeDirect('7')}
-              disabled={grade7Count === 0}
-              className="px-2.5 py-1.5 bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 rounded-lg text-[11px] font-semibold transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
-            >
-              Hapus Kelas 7
-            </button>
-
-            <button
-              onClick={() => handleDeleteByGradeDirect('8')}
-              disabled={grade8Count === 0}
-              className="px-2.5 py-1.5 bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 rounded-lg text-[11px] font-semibold transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
-            >
-              Hapus Kelas 8
-            </button>
-
-            <button
-              onClick={() => handleDeleteByGradeDirect('9')}
-              disabled={grade9Count === 0}
-              className="px-2.5 py-1.5 bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 rounded-lg text-[11px] font-semibold transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
-            >
-              Hapus Kelas 9
-            </button>
-
-            <button
-              onClick={handleDeleteAll}
-              disabled={students.length === 0}
-              className="px-2.5 py-1.5 bg-slate-900 hover:bg-black text-rose-300 rounded-lg text-[11px] font-semibold transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
-            >
-              Hapus Semua Siswa
-            </button>
-          </div>
-        </div>
-
-        {/* Floating/Banner Action when items are selected */}
-        {selectedStudentIds.size > 0 && (
-          <div className="p-3 bg-blue-900 text-white rounded-lg flex flex-wrap items-center justify-between gap-3 shadow-md animate-in fade-in">
-            <div className="flex items-center gap-2 text-xs">
-              <CheckCircle2 className="w-4 h-4 text-emerald-400" />
-              <span>
-                <strong className="font-bold text-white font-mono text-sm">{selectedStudentIds.size}</strong> siswa sedang ditandai.
-              </span>
-            </div>
-
-            <div className="flex items-center gap-2">
-              <button
-                onClick={handleClearSelection}
-                className="px-3 py-1.5 text-xs text-slate-300 hover:text-white transition-colors cursor-pointer"
-              >
-                Batalkan
-              </button>
-              <button
-                onClick={handleDeleteSelected}
-                className="flex items-center gap-1.5 px-3.5 py-1.5 bg-rose-600 hover:bg-rose-700 text-white rounded-md text-xs font-bold shadow-xs transition-colors cursor-pointer"
-              >
-                <Trash2 className="w-3.5 h-3.5" />
-                <span>Hapus {selectedStudentIds.size} Siswa Terpilih</span>
-              </button>
-            </div>
           </div>
         )}
       </div>
 
-      {/* Filter Toolbar */}
-      <div className="flex flex-wrap items-center gap-2 bg-white p-3 rounded-xl border border-slate-200 text-xs">
-        <span className="font-semibold text-slate-600 mr-2 flex items-center gap-1">
-          <Filter className="w-3.5 h-3.5 text-slate-400" />
-          Filter Rombel:
-        </span>
-        <select
-          value={selectedGrade}
-          onChange={(e) => {
-            setSelectedGrade(e.target.value);
-            setSelectedClass('ALL');
-          }}
-          className="bg-slate-50 border border-slate-200 rounded px-2.5 py-1.5 text-slate-800 focus:outline-none focus:ring-1 focus:ring-blue-600 font-medium"
-        >
-          <option value="ALL">Semua Tingkat (7, 8, 9)</option>
-          <option value="7">Tingkat 7 ({grade7Count} Siswa)</option>
-          <option value="8">Tingkat 8 ({grade8Count} Siswa)</option>
-          <option value="9">Tingkat 9 ({grade9Count} Siswa)</option>
-        </select>
+      {/* Operator Admin Toolbars vs Wali Kelas Scope Indicator */}
+      {isWalas ? (
+        <div className="bg-blue-50 border border-blue-200 p-3.5 rounded-xl flex flex-wrap items-center justify-between gap-3 text-xs shadow-2xs">
+          <div className="flex items-center gap-2">
+            <span className="font-bold text-blue-950">Rombel Binaan Khusus:</span>
+            <span className="bg-blue-600 text-white font-mono font-bold px-2.5 py-0.5 rounded-md text-xs">{walasClassId}</span>
+            <span className="text-slate-600 font-medium">· Total {filteredStudents.length} Siswa Terdaftar</span>
+          </div>
+          <span className="text-[11px] font-semibold text-blue-800 bg-white border border-blue-200 px-3 py-1 rounded-lg">
+            Wali Kelas: {currentUser?.name || 'Wali Kelas'}
+          </span>
+        </div>
+      ) : (
+        <>
+          {/* Quick Mark & Auto Delete Toolbar */}
+          <div className="bg-slate-50 border border-slate-200 rounded-xl p-3.5 space-y-3">
+            <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3">
+              {/* Quick Mark Buttons for Grade 7, 8, 9 */}
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="text-xs font-bold text-slate-700 mr-1 flex items-center gap-1">
+                  <CheckSquare className="w-3.5 h-3.5 text-blue-600" />
+                  Tandai Cepat:
+                </span>
 
-        <select
-          value={selectedClass}
-          onChange={(e) => setSelectedClass(e.target.value)}
-          className="bg-slate-50 border border-slate-200 rounded px-2.5 py-1.5 text-slate-800 focus:outline-none focus:ring-1 focus:ring-blue-600 font-medium"
-        >
-          <option value="ALL">Semua Kelas ({classes.length} Rombel)</option>
-          {classes
-            .filter((c) => selectedGrade === 'ALL' || c.gradeLevel === selectedGrade)
-            .map((c) => (
-              <option key={c.classId} value={c.classId}>
-                {c.classId} ({c.studentCount} Siswa)
-              </option>
-            ))}
-        </select>
+                <button
+                  onClick={() => handleSelectGrade('7')}
+                  className="px-3 py-1.5 bg-white border border-slate-300 hover:border-blue-500 hover:bg-blue-50/50 text-slate-800 rounded-lg text-xs font-semibold transition-all shadow-2xs cursor-pointer"
+                >
+                  Semua Kelas 7 ({grade7Count})
+                </button>
 
-        <span className="text-xs text-slate-400 ml-auto font-mono tabular-nums">
-          Ditemukan {filteredStudents.length} siswa
-        </span>
-      </div>
+                <button
+                  onClick={() => handleSelectGrade('8')}
+                  className="px-3 py-1.5 bg-white border border-slate-300 hover:border-blue-500 hover:bg-blue-50/50 text-slate-800 rounded-lg text-xs font-semibold transition-all shadow-2xs cursor-pointer"
+                >
+                  Semua Kelas 8 ({grade8Count})
+                </button>
+
+                <button
+                  onClick={() => handleSelectGrade('9')}
+                  className="px-3 py-1.5 bg-white border border-slate-300 hover:border-blue-500 hover:bg-blue-50/50 text-slate-800 rounded-lg text-xs font-semibold transition-all shadow-2xs cursor-pointer"
+                >
+                  Semua Kelas 9 ({grade9Count})
+                </button>
+
+                <button
+                  onClick={handleSelectAllFiltered}
+                  className="px-3 py-1.5 bg-white border border-slate-300 hover:border-slate-400 text-slate-700 rounded-lg text-xs font-medium transition-colors cursor-pointer shadow-2xs"
+                >
+                  {allFilteredSelected ? 'Batalkan Filter Ini' : `Tandai Tampilan (${filteredStudents.length})`}
+                </button>
+
+                {selectedStudentIds.size > 0 && (
+                  <button
+                    onClick={handleClearSelection}
+                    className="px-2.5 py-1.5 text-xs text-slate-500 hover:text-slate-800 font-medium underline cursor-pointer"
+                  >
+                    Kosongkan Pilihan
+                  </button>
+                )}
+              </div>
+
+              {/* Direct Grade Deletion Buttons */}
+              <div className="flex flex-wrap items-center gap-2 border-t lg:border-t-0 pt-2 lg:pt-0">
+                <span className="text-xs font-bold text-rose-700 mr-1 flex items-center gap-1">
+                  <Trash2 className="w-3.5 h-3.5 text-rose-600" />
+                  Hapus Massal Langsung:
+                </span>
+
+                <button
+                  onClick={() => handleDeleteByGradeDirect('7')}
+                  disabled={grade7Count === 0}
+                  className="px-2.5 py-1.5 bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 rounded-lg text-[11px] font-semibold transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+                >
+                  Hapus Kelas 7
+                </button>
+
+                <button
+                  onClick={() => handleDeleteByGradeDirect('8')}
+                  disabled={grade8Count === 0}
+                  className="px-2.5 py-1.5 bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 rounded-lg text-[11px] font-semibold transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+                >
+                  Hapus Kelas 8
+                </button>
+
+                <button
+                  onClick={() => handleDeleteByGradeDirect('9')}
+                  disabled={grade9Count === 0}
+                  className="px-2.5 py-1.5 bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 rounded-lg text-[11px] font-semibold transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+                >
+                  Hapus Kelas 9
+                </button>
+
+                <button
+                  onClick={handleDeleteAll}
+                  disabled={students.length === 0}
+                  className="px-2.5 py-1.5 bg-slate-900 hover:bg-black text-rose-300 rounded-lg text-[11px] font-semibold transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+                >
+                  Hapus Semua Siswa
+                </button>
+              </div>
+            </div>
+
+            {/* Floating/Banner Action when items are selected */}
+            {selectedStudentIds.size > 0 && (
+              <div className="p-3 bg-blue-900 text-white rounded-lg flex flex-wrap items-center justify-between gap-3 shadow-md animate-in fade-in">
+                <div className="flex items-center gap-2 text-xs">
+                  <CheckCircle2 className="w-4 h-4 text-emerald-400" />
+                  <span>
+                    <strong className="font-bold text-white font-mono text-sm">{selectedStudentIds.size}</strong> siswa sedang ditandai.
+                  </span>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={handleClearSelection}
+                    className="px-3 py-1.5 text-xs text-slate-300 hover:text-white transition-colors cursor-pointer"
+                  >
+                    Batalkan
+                  </button>
+                  <button
+                    onClick={handleDeleteSelected}
+                    className="flex items-center gap-1.5 px-3.5 py-1.5 bg-rose-600 hover:bg-rose-700 text-white rounded-md text-xs font-bold shadow-xs transition-colors cursor-pointer"
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                    <span>Hapus {selectedStudentIds.size} Siswa Terpilih</span>
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Filter Toolbar */}
+          <div className="flex flex-wrap items-center gap-2 bg-white p-3 rounded-xl border border-slate-200 text-xs">
+            <span className="font-semibold text-slate-600 mr-2 flex items-center gap-1">
+              <Filter className="w-3.5 h-3.5 text-slate-400" />
+              Filter Rombel:
+            </span>
+            <select
+              value={selectedGrade}
+              onChange={(e) => {
+                setSelectedGrade(e.target.value);
+                setSelectedClass('ALL');
+              }}
+              className="bg-slate-50 border border-slate-200 rounded px-2.5 py-1.5 text-slate-800 focus:outline-none focus:ring-1 focus:ring-blue-600 font-medium"
+            >
+              <option value="ALL">Semua Tingkat (7, 8, 9)</option>
+              <option value="7">Tingkat 7 ({grade7Count} Siswa)</option>
+              <option value="8">Tingkat 8 ({grade8Count} Siswa)</option>
+              <option value="9">Tingkat 9 ({grade9Count} Siswa)</option>
+            </select>
+
+            <select
+              value={selectedClass}
+              onChange={(e) => setSelectedClass(e.target.value)}
+              className="bg-slate-50 border border-slate-200 rounded px-2.5 py-1.5 text-slate-800 focus:outline-none focus:ring-1 focus:ring-blue-600 font-medium"
+            >
+              <option value="ALL">Semua Kelas ({classes.length} Rombel)</option>
+              {classes
+                .filter((c) => selectedGrade === 'ALL' || c.gradeLevel === selectedGrade)
+                .map((c) => (
+                  <option key={c.classId} value={c.classId}>
+                    {c.classId} ({c.studentCount} Siswa)
+                  </option>
+                ))}
+            </select>
+
+            <span className="text-xs text-slate-400 ml-auto font-mono tabular-nums">
+              Ditemukan {filteredStudents.length} siswa
+            </span>
+          </div>
+        </>
+      )}
 
       {/* Data Table */}
       <DataTable

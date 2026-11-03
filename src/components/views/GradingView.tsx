@@ -21,6 +21,7 @@ export const GradingView: React.FC = () => {
     students,
     classes,
     subjects,
+    schedules,
     grades,
     saveBatchGrades,
     dailyScores,
@@ -29,9 +30,47 @@ export const GradingView: React.FC = () => {
   } = useSchool();
   const { currentUser, activeRole } = useAuth();
 
+  // Requirement 3: Restrict classes and subjects for Guru Mapel to what they actually teach
+  const isTeacher = activeRole === 'guru_mapel';
+  const teacherSchedules = React.useMemo(() => {
+    if (!isTeacher) return schedules;
+    const code = currentUser?.teacherCode;
+    const name = currentUser?.name?.toLowerCase();
+    return schedules.filter(
+      (s) => (code && s.teacherCode === code) || (name && s.teacherName.toLowerCase() === name)
+    );
+  }, [schedules, isTeacher, currentUser]);
+
+  const availableClasses = React.useMemo(() => {
+    if (!isTeacher) return classes;
+    const taughtClassIds = Array.from(new Set(teacherSchedules.map((s) => s.classId)));
+    const filtered = classes.filter((c) => taughtClassIds.includes(c.classId));
+    return filtered.length > 0 ? filtered : classes;
+  }, [classes, isTeacher, teacherSchedules]);
+
+  const availableSubjects = React.useMemo(() => {
+    if (!isTeacher) return subjects;
+    const taughtSubjectCodes = Array.from(new Set(teacherSchedules.map((s) => s.subjectCode)));
+    const filtered = subjects.filter((s) => taughtSubjectCodes.includes(s.code));
+    return filtered.length > 0 ? filtered : subjects;
+  }, [subjects, isTeacher, teacherSchedules]);
+
   const [activeTab, setActiveTab] = useState<'per_date' | 'rekap'>('per_date');
-  const [selectedClass, setSelectedClass] = useState<string>(classes[0]?.classId || '7A');
-  const [selectedSubjectCode, setSelectedSubjectCode] = useState<string>(subjects[0]?.code || 'BIN');
+  const [selectedClass, setSelectedClass] = useState<string>(() => availableClasses[0]?.classId || classes[0]?.classId || '7A');
+  const [selectedSubjectCode, setSelectedSubjectCode] = useState<string>(() => availableSubjects[0]?.code || subjects[0]?.code || 'BIN');
+
+  // Keep selectedClass and selectedSubjectCode valid when available options change
+  React.useEffect(() => {
+    if (availableClasses.length > 0 && !availableClasses.some((c) => c.classId === selectedClass)) {
+      setSelectedClass(availableClasses[0].classId);
+    }
+  }, [availableClasses, selectedClass]);
+
+  React.useEffect(() => {
+    if (availableSubjects.length > 0 && !availableSubjects.some((s) => s.code === selectedSubjectCode)) {
+      setSelectedSubjectCode(availableSubjects[0].code);
+    }
+  }, [availableSubjects, selectedSubjectCode]);
 
   // Network/Local Timezone Date
   const todayStr = new Date().toISOString().split('T')[0];
@@ -294,7 +333,7 @@ export const GradingView: React.FC = () => {
               onChange={(e) => setSelectedClass(e.target.value)}
               className="bg-slate-50 border border-slate-200 rounded px-3 py-1.5 text-xs font-bold text-blue-700 focus:outline-none focus:ring-1 focus:ring-blue-600"
             >
-              {classes.map((c) => (
+              {availableClasses.map((c) => (
                 <option key={c.classId} value={c.classId}>
                   {c.classId} ({c.studentCount} Siswa)
                 </option>
@@ -309,7 +348,7 @@ export const GradingView: React.FC = () => {
               onChange={(e) => setSelectedSubjectCode(e.target.value)}
               className="bg-slate-50 border border-slate-200 rounded px-3 py-1.5 text-xs font-semibold text-slate-900 focus:outline-none focus:ring-1 focus:ring-blue-600"
             >
-              {subjects.map((s) => (
+              {availableSubjects.map((s) => (
                 <option key={s.code} value={s.code}>
                   [{s.code}] {s.name} · {s.hoursPerWeek} JP/Minggu
                 </option>

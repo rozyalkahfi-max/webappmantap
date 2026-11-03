@@ -22,6 +22,7 @@ import {
 import { useSchool } from '../../context/SchoolContext';
 import { useAuth } from '../../context/AuthContext';
 import { ScheduleItem } from '../../types';
+import { consolidateScheduleItems, ConsolidatedScheduleItem } from '../../utils/scheduleConsolidator';
 
 export const ScheduleView: React.FC<{ onNavigate?: (menuId: string) => void }> = ({ onNavigate }) => {
   const {
@@ -208,16 +209,17 @@ export const ScheduleView: React.FC<{ onNavigate?: (menuId: string) => void }> =
     });
   };
 
-  // In teacher mode, only show teacher's own schedules
+  // In teacher mode, consolidate contiguous periods into single combined cards (Requirement 1)
   const effectiveSchedules = useMemo(() => {
     if (!isTeacher) return schedules;
-    return schedules.filter((s) => {
+    const myRaw = schedules.filter((s) => {
       const code = currentUser?.teacherCode;
       const name = currentUser?.name?.toLowerCase();
       if (code && s.teacherCode === code) return true;
       if (name && s.teacherName.toLowerCase().includes(name)) return true;
       return false;
     });
+    return consolidateScheduleItems(myRaw);
   }, [schedules, isTeacher, currentUser]);
 
   // Filtered schedules for Menyeluruh View
@@ -498,6 +500,72 @@ export const ScheduleView: React.FC<{ onNavigate?: (menuId: string) => void }> =
                   {daySchedules.length === 0 ? (
                     <div className="text-center py-8 text-slate-400 text-xs">
                       Tidak ada jadwal pembelajaran pada hari {dayName}.
+                    </div>
+                  ) : isTeacher ? (
+                    <div className="space-y-3">
+                      <div className="flex items-center justify-between pb-2 mb-1 border-b border-slate-100">
+                        <div className="flex items-center gap-2">
+                          <span className="w-2.5 h-2.5 rounded-full bg-blue-600" />
+                          <h4 className="text-xs font-bold text-slate-900">
+                            Jadwal KBM Mengajar Anda (Presensi Satu Kali Per Sesi)
+                          </h4>
+                        </div>
+                        <span className="text-[11px] font-semibold text-blue-700 bg-blue-50 px-2 py-0.5 rounded border border-blue-100">
+                          {daySchedules.length} Sesi Terjadwal
+                        </span>
+                      </div>
+
+                      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
+                        {daySchedules.map((item: any) => (
+                          <div
+                            key={item.id}
+                            className="p-3.5 bg-gradient-to-br from-white to-blue-50/40 border border-slate-200 hover:border-blue-400 rounded-xl text-xs flex flex-col justify-between transition-all group shadow-2xs space-y-3"
+                          >
+                            <div>
+                              <div className="flex items-center justify-between mb-1.5">
+                                <span className={`px-2 py-0.5 rounded font-mono font-bold text-[11px] border ${getGradeBadgeColor(item.classId)}`}>
+                                  Kelas {item.classId}
+                                </span>
+                                <span className="font-mono text-[10px] font-bold text-blue-700 bg-blue-100 px-1.5 py-0.5 rounded">
+                                  {item.subjectCode}
+                                </span>
+                              </div>
+                              <h5 className="font-bold text-slate-900 line-clamp-1 text-sm">
+                                {item.subjectName}
+                              </h5>
+                              <div className="flex items-center gap-1.5 text-slate-600 text-[11px] mt-1">
+                                <User className="w-3 h-3 text-slate-400 shrink-0" />
+                                <span className="line-clamp-1">{item.teacherName}</span>
+                              </div>
+                            </div>
+
+                            <div className="p-2 bg-white rounded-lg border border-slate-200/80 space-y-1 text-[11px]">
+                              <div className="flex items-center justify-between text-slate-700">
+                                <span className="text-slate-500 font-medium">Jam Pelajaran:</span>
+                                <span className="font-bold font-mono text-blue-700">
+                                  {item.periodDisplay || `Jam Ke-${item.period}`}
+                                </span>
+                              </div>
+                              <div className="flex items-center justify-between text-slate-700">
+                                <span className="text-slate-500 font-medium">Alokasi Waktu:</span>
+                                <span className="font-mono font-semibold text-emerald-700">
+                                  {item.timeDisplay || `${item.startTime} - ${item.endTime}`} WIB
+                                </span>
+                              </div>
+                            </div>
+
+                            {onNavigate && (
+                              <button
+                                onClick={() => onNavigate('attendance')}
+                                className="w-full py-1.5 bg-blue-700 hover:bg-blue-800 text-white rounded-lg text-xs font-semibold shadow-2xs transition-colors flex items-center justify-center gap-1.5 cursor-pointer"
+                              >
+                                <CheckCircle2 className="w-3.5 h-3.5" />
+                                <span>Input Presensi Sesi Ini</span>
+                              </button>
+                            )}
+                          </div>
+                        ))}
+                      </div>
                     </div>
                   ) : (
                     <>

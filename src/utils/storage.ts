@@ -15,6 +15,7 @@ import {
   SystemNotification,
   ActivityLog,
   UserAccount,
+  BKAssignment,
 } from '../types';
 
 const STORAGE_KEY_PREFIX = 'SIMANTAP_LMS_';
@@ -880,6 +881,14 @@ export class SchoolStorage {
     this.setItem('notifications', notifications);
   }
 
+  // BK Assignments (Siswa & Rombel Binaan Guru BK)
+  static getBKAssignments(): BKAssignment[] {
+    return this.getItem<BKAssignment[]>('bk_assignments', []);
+  }
+  static saveBKAssignments(assignments: BKAssignment[]): void {
+    this.setItem('bk_assignments', assignments);
+  }
+
   // Activity Logs
   static getActivityLogs(): ActivityLog[] {
     return this.getItem<ActivityLog[]>('activity_logs', [
@@ -933,6 +942,7 @@ export class SchoolStorage {
       this.setItem('attitudes', []);
       this.setItem('daily_scores', []);
       this.setItem('notifications', []);
+      this.setItem('bk_assignments', []);
       this.setItem('activity_logs', [
         {
           id: `LOG_${Date.now()}`,

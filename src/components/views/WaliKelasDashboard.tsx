@@ -20,7 +20,10 @@ export const WaliKelasDashboard: React.FC<{ onNavigate: (menuId: string) => void
   const { students, classes, attendanceSessions, grades, violations, getStudentPoints } = useSchool();
   const { currentUser } = useAuth();
 
-  const myClassId = currentUser?.classId || '7A';
+  const myClassId =
+    currentUser?.classId ||
+    classes.find((c) => c.homeroomTeacherId === currentUser?.teacherCode)?.classId ||
+    '7A';
   const myClassRoom = classes.find((c) => c.classId === myClassId);
   const classStudents = students.filter((s) => s.classId === myClassId);
 

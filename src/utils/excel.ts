@@ -1,5 +1,5 @@
 import * as XLSX from 'xlsx';
-import { Student, Teacher, ClassRoom, Subject, ViolationRule, UserRole, WaliKelasImportRow } from '../types';
+import { Student, Teacher, ClassRoom, Subject, ViolationRule, UserRole, WaliKelasImportRow, BKImportRow } from '../types';
 import { CLASS_IDS } from './storage';
 
 /**
@@ -978,6 +978,123 @@ export function validateWaliKelasImport(
         password,
         classId,
         academicYear,
+      },
+      isValid,
+      errors,
+      isDuplicate,
+    });
+  });
+
+  return {
+    totalRows: rawRows.length,
+    validRows: validCount,
+    invalidRows: invalidCount,
+    duplicateRows: dupCount,
+    items,
+  };
+}
+
+/**
+ * Generates Template_Import_Siswa_Guru_BK.xlsx
+ * Columns: No, Nama Siswa, Kelas, Guru BK
+ */
+export function generateBKAssignmentTemplate() {
+  const headers = ['No', 'Nama Siswa', 'Kelas', 'Guru BK'];
+  const sampleData = [
+    [1, 'Ahmad Rizky Pratama', '7A', 'Drs. Bambang Irawan, M.Pd'],
+    [2, 'Anindya Putri Kirana', '7A', 'Drs. Bambang Irawan, M.Pd'],
+    [3, 'Bagus Prasetyo', '7B', 'Drs. Bambang Irawan, M.Pd'],
+    [4, 'Cantika Dewi', '7C', 'Drs. Bambang Irawan, M.Pd'],
+    [5, 'Daffa Arya Nugraha', '7D', 'Drs. Bambang Irawan, M.Pd'],
+    [6, 'Eka Safitri', '7E', 'Drs. Bambang Irawan, M.Pd'],
+    [7, 'Fahmi Reza', '7F', 'Drs. Bambang Irawan, M.Pd'],
+    [8, 'Galih Pratama', '7G', 'Siti Aminah, S.Pd'],
+    [9, 'Hafiz Alfarizi', '7H', 'Siti Aminah, S.Pd'],
+    [10, 'Intan Permata', '8A', 'Siti Aminah, S.Pd'],
+    [11, 'Joko Susanto', '8B', 'Siti Aminah, S.Pd'],
+    [12, 'Kirana Larasati', '8C', 'Siti Aminah, S.Pd'],
+  ];
+
+  const ws = XLSX.utils.aoa_to_sheet([headers, ...sampleData]);
+  ws['!cols'] = [
+    { wch: 6 },
+    { wch: 28 },
+    { wch: 10 },
+    { wch: 30 },
+  ];
+
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'Pembagian Siswa BK');
+  downloadWorkbook(wb, 'Template_Import_Siswa_Guru_BK.xlsx');
+}
+
+/**
+ * Validates BK Assignment import rows with format:
+ * Nama Siswa, Kelas, Guru BK
+ */
+export function validateBKAssignmentImport(
+  rawRows: any[],
+  existingTeachers: Teacher[],
+  availableClasses: string[],
+  existingStudents: Student[]
+): ValidationSummary<BKImportRow> {
+  const items: ValidationItemResult<BKImportRow>[] = [];
+  let validCount = 0;
+  let invalidCount = 0;
+  let dupCount = 0;
+
+  const validClassSet = new Set(availableClasses.map((c) => c.toUpperCase()));
+  const seenStudentClass = new Set<string>();
+
+  rawRows.forEach((row, idx) => {
+    const rowNum = idx + 2;
+
+    const studentName = String(
+      findFieldValue(row, ['nama siswa', 'nama_siswa', 'nama', 'peserta didik', 'nama peserta didik']) || ''
+    ).trim();
+
+    const classIdRaw = String(
+      findFieldValue(row, ['kelas', 'kelas id', 'kelas_id', 'rombel', 'class']) || ''
+    ).trim();
+    const classId = classIdRaw.toUpperCase();
+
+    const counselorName = String(
+      findFieldValue(row, ['guru bk', 'guru_bk', 'konselor', 'nama guru bk', 'guru', 'bk']) || ''
+    ).trim();
+
+    const errors: string[] = [];
+    let isDuplicate = false;
+
+    if (!classId) errors.push('Kolom Kelas wajib diisi (Contoh: 7A, 8B)');
+    else if (!validClassSet.has(classId) && !CLASS_IDS.includes(classId)) {
+      errors.push(`Kelas '${classId}' tidak terdaftar dalam rombel sekolah (7A–9H)`);
+    }
+
+    if (!counselorName) {
+      errors.push('Nama Guru BK wajib diisi');
+    }
+
+    const key = `${studentName.toLowerCase()}_${classId}`;
+    if (studentName) {
+      if (seenStudentClass.has(key)) {
+        errors.push(`Siswa '${studentName}' di kelas '${classId}' muncul lebih dari sekali di berkas ini`);
+        isDuplicate = true;
+      } else {
+        seenStudentClass.add(key);
+      }
+    }
+
+    const isValid = errors.length === 0;
+    if (isValid) validCount++;
+    else invalidCount++;
+    if (isDuplicate) dupCount++;
+
+    items.push({
+      rowNumber: rowNum,
+      data: {
+        studentName: studentName || undefined,
+        classId,
+        counselorName,
       },
       isValid,
       errors,

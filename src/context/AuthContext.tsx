@@ -109,8 +109,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       return { success: false, message: 'Username atau email tidak terdaftar dalam sistem.' };
     }
 
-    // Dynamic role calculation based on master teacher data per rule A:
+    // Dynamic role calculation based on master teacher data per rules:
     // - BK who also teaches -> has guru_mapel and guru_bk
+    // - Pure BK without teaching data -> strictly guru_bk only (no guru_mapel option, direct to BK portal)
     // - Pure subject teacher -> only guru_mapel
     // - Teacher + Wali kelas -> has guru_mapel and wali_kelas
     // - Teacher + Wali kelas + BK -> has all three!
@@ -133,13 +134,57 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       const isWalas = !!matchedTeacher.classId || matchedTeacher.role === 'wali_kelas';
       if (isWalas) detectedRoles.push('wali_kelas');
 
-      const isMapel =
-        matchedTeacher.role === 'guru_mapel' ||
-        (matchedTeacher.subject &&
-          !matchedTeacher.subject.toLowerCase().startsWith('operator') &&
-          !matchedTeacher.subject.toLowerCase().startsWith('manajemen'));
-      if (isMapel && !detectedRoles.includes('guru_mapel')) {
-        detectedRoles.push('guru_mapel');
+      // Check whether teacher actually has teaching schedules or additional non-BK teaching subjects
+      const allSchedules = SchoolStorage.getSchedules();
+      const hasTeachingSchedules = allSchedules.some(
+        (s) =>
+          (matchedTeacher.teacherCode && s.teacherCode.toLowerCase() === matchedTeacher.teacherCode.toLowerCase()) ||
+          s.teacherName.toLowerCase().includes(matchedTeacher.name.toLowerCase())
+      );
+
+      const cleanSub = (matchedTeacher.subject || '').toLowerCase().trim();
+      const isPureBkSubject =
+        cleanSub === 'bimbingan konseling' ||
+        cleanSub === 'bimbingan & konseling' ||
+        cleanSub === 'bk' ||
+        cleanSub === 'konseling' ||
+        cleanSub === 'konselor' ||
+        cleanSub === 'guru bk';
+
+      const hasAdditionalTeachingSubject =
+        matchedTeacher.subject &&
+        !isPureBkSubject &&
+        !cleanSub.startsWith('operator') &&
+        !cleanSub.startsWith('manajemen') &&
+        (cleanSub.includes('&') ||
+          cleanSub.includes('prakarya') ||
+          cleanSub.includes('ipa') ||
+          cleanSub.includes('ips') ||
+          cleanSub.includes('matematika') ||
+          cleanSub.includes('bahasa') ||
+          cleanSub.includes('informatika') ||
+          cleanSub.includes('seni') ||
+          cleanSub.includes('pjok') ||
+          cleanSub.includes('penjas') ||
+          cleanSub.includes('agama') ||
+          cleanSub.includes('ppkn'));
+
+      if (isBk) {
+        // Requirement 4: only add guru_mapel if they have teaching data or additional subjects
+        if (hasTeachingSchedules || hasAdditionalTeachingSubject || matchedTeacher.role === 'guru_mapel') {
+          if (!detectedRoles.includes('guru_mapel')) {
+            detectedRoles.push('guru_mapel');
+          }
+        }
+      } else {
+        const isMapel =
+          matchedTeacher.role === 'guru_mapel' ||
+          (matchedTeacher.subject &&
+            !cleanSub.startsWith('operator') &&
+            !cleanSub.startsWith('manajemen'));
+        if (isMapel && !detectedRoles.includes('guru_mapel')) {
+          detectedRoles.push('guru_mapel');
+        }
       }
 
       if (matchedTeacher.role === 'admin_operator') detectedRoles = ['admin_operator'];
@@ -160,11 +205,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         email: matchedTeacher.email,
       };
     } else if (user && matchedTeacher) {
-      // Merge detected roles from teacher master
-      const combinedRoles = Array.from(new Set([...user.availableRoles, ...detectedRoles]));
+      // Synchronize availableRoles with freshly detected roles based on actual master & schedule data
       user = {
         ...user,
-        availableRoles: combinedRoles,
+        role: detectedRoles.includes(user.role) ? user.role : (detectedRoles[0] || matchedTeacher.role),
+        availableRoles: detectedRoles,
         classId: detectedClassId || user.classId,
         teacherCode: detectedTeacherCode || user.teacherCode,
         subject: detectedSubject || user.subject,

@@ -22,14 +22,17 @@ export const WaliAttendanceView: React.FC = () => {
   const { students, classes, attendanceSessions, settings } = useSchool();
   const { currentUser } = useAuth();
 
-  const myClassId = currentUser?.classId || '7A';
+  const myClassId = useMemo(() => {
+    return currentUser?.classId || classes.find((c) => c.homeroomTeacherId === currentUser?.teacherCode)?.classId || '7A';
+  }, [currentUser, classes]);
+
   const myClassRoom = classes.find((c) => c.classId === myClassId);
   const classStudents = useMemo(() => {
     return students.filter((s) => s.classId === myClassId);
   }, [students, myClassId]);
 
   // Date selection
-  const today = '2026-10-31';
+  const today = new Date().toISOString().split('T')[0];
   const [selectedDate, setSelectedDate] = useState<string>(today);
   const [isPrintModalOpen, setIsPrintModalOpen] = useState(false);
 

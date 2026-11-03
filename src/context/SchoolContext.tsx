@@ -17,6 +17,8 @@ import {
   ActivityLog,
   WaliKelasImportRow,
   UserRole,
+  BKAssignment,
+  BKImportRow,
 } from '../types';
 import { SchoolStorage, CLASS_IDS, ADMIN_TEACHER } from '../utils/storage';
 import { useAuth } from './AuthContext';
@@ -106,6 +108,15 @@ interface SchoolContextType {
   updateCounselingRecord: (id: string, updates: Partial<CounselingRecord>) => void;
   priorityBkStudents: { student: Student; totalPoints: number; violations: ViolationRecord[]; latestCounseling?: CounselingRecord }[];
 
+  bkAssignments: BKAssignment[];
+  assignClassesToBK: (counselorIdentifier: string, classIds: string[]) => void;
+  assignStudentToBK: (studentId: string, counselorIdentifier: string) => void;
+  importBKAssignmentsBatch: (rows: BKImportRow[]) => { added: number; updated: number; total: number };
+  getBKForClass: (classId: string) => Teacher | undefined;
+  getBKForStudent: (studentId: string, classId: string) => Teacher | undefined;
+  getBKAssignedClasses: (counselorIdentifier: string) => string[];
+  getBKAssignedStudents: (counselorIdentifier: string) => Student[];
+
   attitudes: AttitudeAssessment[];
   saveAttitude: (attitude: Omit<AttitudeAssessment, 'id'>) => void;
 
@@ -135,6 +146,39 @@ export const SchoolProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   const [violationRules, setViolationRules] = useState<ViolationRule[]>(() => SchoolStorage.getViolationRules());
   const [dailyScores, setDailyScores] = useState<DailyScoreRecord[]>(() => SchoolStorage.getDailyScores());
   const [counselingRecords, setCounselingRecords] = useState<CounselingRecord[]>(() => SchoolStorage.getCounselingRecords());
+  const [bkAssignments, setBkAssignments] = useState<BKAssignment[]>(() => {
+    const saved = SchoolStorage.getBKAssignments();
+    if (saved && saved.length > 0) return saved;
+
+    // Default setup: if teachers exist and empty, map 7A-7F to Bambang and 7G-8C to Siti Aminah
+    const initialTeachers = SchoolStorage.getTeachers();
+    const bambang = initialTeachers.find(t => t.code === 'G15' || t.name.includes('Bambang'));
+    const aminah = initialTeachers.find(t => t.code === 'G16' || t.name.includes('Siti Aminah'));
+    const defaultList: BKAssignment[] = [];
+    if (bambang) {
+      ['7A', '7B', '7C', '7D', '7E', '7F'].forEach(cid => {
+        defaultList.push({
+          id: `BKA_INIT_${cid}`,
+          counselorId: bambang.id,
+          counselorName: bambang.name,
+          classId: cid,
+          assignedAt: new Date().toISOString(),
+        });
+      });
+    }
+    if (aminah) {
+      ['7G', '7H', '7I', '8A', '8B', '8C'].forEach(cid => {
+        defaultList.push({
+          id: `BKA_INIT_${cid}`,
+          counselorId: aminah.id,
+          counselorName: aminah.name,
+          classId: cid,
+          assignedAt: new Date().toISOString(),
+        });
+      });
+    }
+    return defaultList;
+  });
   const [attitudes, setAttitudes] = useState<AttitudeAssessment[]>(() => SchoolStorage.getAttitudes());
   const [notifications, setNotifications] = useState<SystemNotification[]>(() => SchoolStorage.getNotifications());
   const [activityLogs, setActivityLogs] = useState<ActivityLog[]>(() => SchoolStorage.getActivityLogs());
@@ -167,6 +211,7 @@ export const SchoolProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   useEffect(() => { SchoolStorage.saveViolationRules(violationRules); }, [violationRules]);
   useEffect(() => { SchoolStorage.saveDailyScores(dailyScores); }, [dailyScores]);
   useEffect(() => { SchoolStorage.saveCounselingRecords(counselingRecords); }, [counselingRecords]);
+  useEffect(() => { SchoolStorage.saveBKAssignments(bkAssignments); }, [bkAssignments]);
   useEffect(() => { SchoolStorage.saveAttitudes(attitudes); }, [attitudes]);
   useEffect(() => { SchoolStorage.saveNotifications(notifications); }, [notifications]);
   useEffect(() => { SchoolStorage.saveActivityLogs(activityLogs); }, [activityLogs]);
@@ -948,6 +993,255 @@ export const SchoolProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     });
   };
 
+  // Counselor (Guru BK) helper lookup & assignments
+  const findCounselor = (identifier: string): Teacher | undefined => {
+    return teachers.find(
+      (t) =>
+        t.id === identifier ||
+        t.code === identifier ||
+        t.name.toLowerCase() === identifier.toLowerCase() ||
+        t.username === identifier
+    );
+  };
+
+  const getBKAssignedClasses = (counselorIdentifier: string): string[] => {
+    const counselor = findCounselor(counselorIdentifier);
+    const assignedSet = new Set<string>();
+
+    if (counselor?.bkClasses) {
+      counselor.bkClasses.forEach((cid) => assignedSet.add(cid));
+    }
+
+    bkAssignments.forEach((a) => {
+      if (
+        (counselor && a.counselorId === counselor.id) ||
+        (counselor && a.counselorName.toLowerCase() === counselor.name.toLowerCase()) ||
+        a.counselorId === counselorIdentifier ||
+        a.counselorName.toLowerCase() === counselorIdentifier.toLowerCase()
+      ) {
+        if (a.classId) assignedSet.add(a.classId);
+      }
+    });
+
+    return Array.from(assignedSet);
+  };
+
+  const getBKAssignedStudents = (counselorIdentifier: string): Student[] => {
+    const counselor = findCounselor(counselorIdentifier);
+    const assignedClasses = new Set(getBKAssignedClasses(counselorIdentifier));
+
+    const directStudentIds = new Set<string>();
+    bkAssignments.forEach((a) => {
+      if (
+        (counselor && a.counselorId === counselor.id) ||
+        (counselor && a.counselorName.toLowerCase() === counselor.name.toLowerCase()) ||
+        a.counselorId === counselorIdentifier ||
+        a.counselorName.toLowerCase() === counselorIdentifier.toLowerCase()
+      ) {
+        if (a.studentId) directStudentIds.add(a.studentId);
+      }
+    });
+
+    return students.filter((s) => directStudentIds.has(s.id) || assignedClasses.has(s.classId));
+  };
+
+  const getBKForClass = (classId: string): Teacher | undefined => {
+    const assignment = bkAssignments.find((a) => a.classId === classId);
+    if (assignment) {
+      const match = findCounselor(assignment.counselorId) || findCounselor(assignment.counselorName);
+      if (match) return match;
+    }
+    const teacherMatch = teachers.find((t) => t.isBK && t.bkClasses?.includes(classId));
+    if (teacherMatch) return teacherMatch;
+
+    return undefined;
+  };
+
+  const getBKForStudent = (studentId: string, classId: string): Teacher | undefined => {
+    const direct = bkAssignments.find((a) => a.studentId === studentId);
+    if (direct) {
+      const match = findCounselor(direct.counselorId) || findCounselor(direct.counselorName);
+      if (match) return match;
+    }
+    return getBKForClass(classId);
+  };
+
+  const assignClassesToBK = (counselorIdentifier: string, classIds: string[]) => {
+    const counselor = findCounselor(counselorIdentifier);
+    if (!counselor) return;
+
+    setTeachers((prev) =>
+      prev.map((t) => (t.id === counselor.id ? { ...t, isBK: true, bkClasses: classIds } : t))
+    );
+
+    setBkAssignments((prev) => {
+      const filtered = prev.filter((a) => !classIds.includes(a.classId));
+      const newItems: BKAssignment[] = [];
+
+      classIds.forEach((cid) => {
+        const classStudents = students.filter((s) => s.classId === cid);
+        if (classStudents.length > 0) {
+          classStudents.forEach((st) => {
+            newItems.push({
+              id: `BKA_${Date.now()}_${st.id}`,
+              counselorId: counselor.id,
+              counselorName: counselor.name,
+              classId: cid,
+              studentId: st.id,
+              studentName: st.name,
+              nis: st.nis,
+              assignedAt: new Date().toISOString(),
+            });
+          });
+        } else {
+          newItems.push({
+            id: `BKA_CLS_${Date.now()}_${cid}`,
+            counselorId: counselor.id,
+            counselorName: counselor.name,
+            classId: cid,
+            assignedAt: new Date().toISOString(),
+          });
+        }
+      });
+
+      return [...filtered, ...newItems];
+    });
+
+    logAction(
+      'Pembagian Rombel Guru BK',
+      'Master',
+      `Menugaskan Guru BK ${counselor.name} untuk membina kelas: ${classIds.join(', ')}.`
+    );
+  };
+
+  const assignStudentToBK = (studentId: string, counselorIdentifier: string) => {
+    const counselor = findCounselor(counselorIdentifier);
+    const student = students.find((s) => s.id === studentId);
+    if (!counselor || !student) return;
+
+    setBkAssignments((prev) => {
+      const filtered = prev.filter((a) => a.studentId !== studentId);
+      const newItem: BKAssignment = {
+        id: `BKA_${Date.now()}_${student.id}`,
+        counselorId: counselor.id,
+        counselorName: counselor.name,
+        classId: student.classId,
+        studentId: student.id,
+        studentName: student.name,
+        nis: student.nis,
+        assignedAt: new Date().toISOString(),
+      };
+      return [...filtered, newItem];
+    });
+
+    logAction(
+      'Penugasan Siswa Guru BK',
+      'BK',
+      `Menugaskan siswa ${student.name} (${student.classId}) kepada Guru BK ${counselor.name}.`
+    );
+  };
+
+  const importBKAssignmentsBatch = (rows: BKImportRow[]) => {
+    let added = 0;
+    let updated = 0;
+    const teacherClassMap = new Map<string, Set<string>>();
+
+    setBkAssignments((prev) => {
+      const map = new Map<string, BKAssignment>();
+      prev.forEach((item) => {
+        const key = item.studentId ? `ST_${item.studentId}` : `CLS_${item.classId}`;
+        map.set(key, item);
+      });
+
+      rows.forEach((row) => {
+        const counselor = findCounselor(row.counselorName) || (row.counselorId ? findCounselor(row.counselorId) : undefined);
+        const counselorId = counselor?.id || row.counselorId || `BK_${row.counselorName.replace(/\s+/g, '')}`;
+        const counselorName = counselor?.name || row.counselorName;
+
+        if (counselor) {
+          const clsSet = teacherClassMap.get(counselor.id) || new Set<string>();
+          clsSet.add(row.classId);
+          teacherClassMap.set(counselor.id, clsSet);
+        }
+
+        if (row.studentName) {
+          const matchedStudent = students.find(
+            (s) =>
+              s.classId === row.classId &&
+              (s.name.toLowerCase() === row.studentName!.toLowerCase() ||
+                s.name.toLowerCase().includes(row.studentName!.toLowerCase()))
+          );
+
+          const key = matchedStudent ? `ST_${matchedStudent.id}` : `ST_ROW_${row.classId}_${row.studentName}`;
+          const existing = map.get(key);
+          if (existing) updated++;
+          else added++;
+
+          map.set(key, {
+            id: existing?.id || `BKA_IMP_${Date.now()}_${Math.random()}`,
+            counselorId,
+            counselorName,
+            classId: row.classId,
+            studentId: matchedStudent?.id,
+            studentName: matchedStudent?.name || row.studentName,
+            nis: matchedStudent?.nis,
+            assignedAt: new Date().toISOString(),
+          });
+        } else {
+          const key = `CLS_${row.classId}`;
+          const existing = map.get(key);
+          if (existing) updated++;
+          else added++;
+
+          map.set(key, {
+            id: existing?.id || `BKA_CLS_${Date.now()}_${row.classId}`,
+            counselorId,
+            counselorName,
+            classId: row.classId,
+            assignedAt: new Date().toISOString(),
+          });
+
+          students.filter((s) => s.classId === row.classId).forEach((st) => {
+            const stKey = `ST_${st.id}`;
+            map.set(stKey, {
+              id: `BKA_IMP_${Date.now()}_${st.id}`,
+              counselorId,
+              counselorName,
+              classId: row.classId,
+              studentId: st.id,
+              studentName: st.name,
+              nis: st.nis,
+              assignedAt: new Date().toISOString(),
+            });
+          });
+        }
+      });
+
+      return Array.from(map.values());
+    });
+
+    if (teacherClassMap.size > 0) {
+      setTeachers((prev) =>
+        prev.map((t) => {
+          const newClasses = teacherClassMap.get(t.id);
+          if (newClasses) {
+            const merged = Array.from(new Set([...(t.bkClasses || []), ...Array.from(newClasses)]));
+            return { ...t, isBK: true, bkClasses: merged };
+          }
+          return t;
+        })
+      );
+    }
+
+    logAction(
+      'Import Pembagian Siswa BK',
+      'Import',
+      `Berhasil mengimpor ${added + updated} pembagian siswa & rombel binaan Guru BK (${added} baru, ${updated} diperbarui).`
+    );
+
+    return { added, updated, total: rows.length };
+  };
+
   // Violations & Tiered Guidance/Notification Flow:
   // - 15 points: Early guidance by Wali Kelas
   // - 25 points: System notification to assigned Guru BK
@@ -976,11 +1270,28 @@ export const SchoolProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       .filter((v) => v.studentId === recordData.studentId)
       .reduce((sum, v) => sum + v.points, 0);
 
+    const assignedBK = getBKForStudent(recordData.studentId, recordData.classId);
+    const assignedWalas = classes.find((c) => c.classId === recordData.classId)?.homeroomTeacher;
+
     logAction(
       'Catat Pelanggaran Siswa',
       'Pelanggaran',
-      `Pelanggaran dicatat: ${recordData.studentName} (${recordData.points} poin) - Total akumulasi: ${newTotal} poin.`
+      `Pelanggaran dicatat: ${recordData.studentName} (${recordData.points} poin) - Total akumulasi: ${newTotal} poin. Wali Kelas: ${assignedWalas || '-'}, Guru BK: ${assignedBK?.name || '-'}.`
     );
+
+    // Direct notification to Walas & Guru BK binaan on any reported violation
+    const directNotif: SystemNotification = {
+      id: `NOTIF_VIO_${newId}`,
+      title: `Pelanggaran Siswa: ${recordData.studentName} (${recordData.classId})`,
+      message: `Laporan baru "${recordData.violationName}" (+${recordData.points} poin) dilaporkan oleh ${recordData.reporterName}. Rombel binaan Walas ${assignedWalas || '-'} & Guru BK ${assignedBK?.name || 'terkait'}. Akumulasi saat ini: ${newTotal} poin.`,
+      type: newTotal >= 30 ? 'alert' : newTotal >= 25 ? 'warning' : 'info',
+      targetRoles: ['guru_bk', 'wali_kelas'],
+      targetClassId: recordData.classId,
+      createdAt: new Date().toISOString(),
+      read: false,
+      actionLink: 'violations',
+    };
+    setNotifications((prev) => [directNotif, ...prev]);
 
     // Tier 1: Walas guidance alert (>= 15 points)
     if (newTotal >= 15 && newTotal < 25) {
@@ -1008,7 +1319,7 @@ export const SchoolProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         const bkNotif: SystemNotification = {
           id: notifId,
           title: `Peringatan Kritis Guru BK: ${recordData.studentName}`,
-          message: `Siswa ${recordData.studentName} (Kelas ${recordData.classId}) mendekati ambang batas kritis dengan ${newTotal} poin pelanggaran (>= 25 poin). Diperlukan pendampingan dan pembinaan konseling Guru BK.`,
+          message: `Siswa ${recordData.studentName} (Kelas ${recordData.classId}) mendekati ambang batas kritis dengan ${newTotal} poin pelanggaran (>= 25 poin). Diperlukan pendampingan dan pembinaan konseling Guru BK ${assignedBK?.name || ''}.`,
           type: 'warning',
           targetRoles: ['guru_bk', 'wali_kelas'],
           targetClassId: recordData.classId,
@@ -1213,6 +1524,7 @@ export const SchoolProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     setViolations([]);
     setDailyScores([]);
     setCounselingRecords([]);
+    setBkAssignments([]);
     setAttitudes([]);
     setNotifications([]);
     setActivityLogs(SchoolStorage.getActivityLogs());
@@ -1292,6 +1604,14 @@ export const SchoolProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         addCounselingRecord,
         updateCounselingRecord,
         priorityBkStudents,
+        bkAssignments,
+        assignClassesToBK,
+        assignStudentToBK,
+        importBKAssignmentsBatch,
+        getBKForClass,
+        getBKForStudent,
+        getBKAssignedClasses,
+        getBKAssignedStudents,
         attitudes,
         saveAttitude,
         notifications,

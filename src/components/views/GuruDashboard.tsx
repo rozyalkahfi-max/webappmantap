@@ -15,6 +15,7 @@ import {
 import { useSchool } from '../../context/SchoolContext';
 import { useAuth } from '../../context/AuthContext';
 import { StatCard } from '../common/StatCard';
+import { consolidateScheduleItems } from '../../utils/scheduleConsolidator';
 
 const DAYS_LIST = ['Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu'];
 
@@ -57,34 +58,47 @@ export const GuruDashboard: React.FC<{ onNavigate: (menuId: string) => void }> =
     );
   }, [schedules, myTeacherCode, teacherName]);
 
+  // Requirement 1: Consolidate contiguous periods (e.g. Jam 1 09:30-10:10 & Jam 2 10:10-10:50 -> 1 sesi 09:30-10:50)
+  const myConsolidatedSchedules = useMemo(() => {
+    return consolidateScheduleItems(myAllSchedules);
+  }, [myAllSchedules]);
+
   // Schedules for the selected day, sorted by period (Jam Ke-1, Ke-2, etc.)
   const daySchedules = useMemo(() => {
-    return myAllSchedules
+    return myConsolidatedSchedules
       .filter((s) => s.day === selectedDay)
       .sort((a, b) => a.period - b.period);
-  }, [myAllSchedules, selectedDay]);
+  }, [myConsolidatedSchedules, selectedDay]);
 
   // Unique classes taught across all days
-  const myClasses = Array.from(new Set(myAllSchedules.map((s) => s.classId)));
+  const myClasses = Array.from(new Set(myConsolidatedSchedules.map((s) => s.classId)));
 
-  // Today's attendance sessions recorded by this teacher
+  // Today's date string
   const todayDateStr = new Date().toISOString().split('T')[0];
-  const myDoneSessions = attendanceSessions.filter(
-    (a) =>
-      (a.teacherCode === myTeacherCode || a.teacherName.toLowerCase() === teacherName.toLowerCase()) &&
-      (a.date === todayDateStr || a.date === '2026-10-31')
-  );
 
-  const pendingAttendanceCount = Math.max(0, daySchedules.length - myDoneSessions.length);
+  const pendingAttendanceCount = useMemo(() => {
+    return daySchedules.filter((sch) => {
+      const done = attendanceSessions.some(
+        (ses) =>
+          (ses.date === todayDateStr || ses.date === '2026-10-31') &&
+          (ses.scheduleId === sch.id ||
+            sch.allScheduleIds.includes(ses.scheduleId) ||
+            (ses.classId === sch.classId &&
+              ses.subjectCode === sch.subjectCode &&
+              ses.period === sch.period))
+      );
+      return !done;
+    }).length;
+  }, [daySchedules, attendanceSessions, todayDateStr]);
 
   // Group schedules by days to show teaching summary
   const scheduleDaysSummary = useMemo(() => {
     const summary: Record<string, number> = {};
     DAYS_LIST.forEach((d) => {
-      summary[d] = myAllSchedules.filter((s) => s.day === d).length;
+      summary[d] = myConsolidatedSchedules.filter((s) => s.day === d).length;
     });
     return summary;
-  }, [myAllSchedules]);
+  }, [myConsolidatedSchedules]);
 
   return (
     <div className="space-y-6">
@@ -244,7 +258,15 @@ export const GuruDashboard: React.FC<{ onNavigate: (menuId: string) => void }> =
             </div>
           ) : (
             daySchedules.map((sch) => {
-              const isSubmitted = myDoneSessions.some((s) => s.scheduleId === sch.id);
+              const isSubmitted = attendanceSessions.some(
+                (ses) =>
+                  (ses.date === todayDateStr || ses.date === '2026-10-31') &&
+                  (ses.scheduleId === sch.id ||
+                    sch.allScheduleIds.includes(ses.scheduleId) ||
+                    (ses.classId === sch.classId &&
+                      ses.subjectCode === sch.subjectCode &&
+                      ses.period === sch.period))
+              );
 
               return (
                 <div
@@ -261,15 +283,20 @@ export const GuruDashboard: React.FC<{ onNavigate: (menuId: string) => void }> =
                       <div className="flex flex-wrap items-center gap-2">
                         <span className="font-bold text-slate-900 text-sm">{sch.subjectName}</span>
                         <span className="text-[11px] font-mono font-bold text-blue-700 bg-blue-50 border border-blue-200 px-2 py-0.5 rounded">
-                          Jam Ke-{sch.period}
+                          {sch.periodDisplay}
                         </span>
+                        {sch.periodCount > 1 && (
+                          <span className="text-[10px] font-bold text-indigo-700 bg-indigo-50 border border-indigo-200 px-2 py-0.5 rounded">
+                            {sch.periodCount} JP Terpadu (Presensi 1x)
+                          </span>
+                        )}
                         <span className="text-[10px] font-medium text-slate-500 bg-slate-100 px-2 py-0.5 rounded">
                           Kode: {sch.subjectCode}
                         </span>
                       </div>
                       <p className="text-slate-500 font-mono text-[11px] mt-1 flex items-center gap-2">
                         <Clock className="w-3.5 h-3.5 text-slate-400" />
-                        <span>Pukul: {sch.startTime} - {sch.endTime} WIB</span>
+                        <span>Pukul: {sch.timeDisplay} WIB</span>
                         <span>·</span>
                         <span>Pengajar: {sch.teacherName} ({sch.teacherCode})</span>
                       </p>

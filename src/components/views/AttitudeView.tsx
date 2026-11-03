@@ -8,8 +8,22 @@ export const AttitudeView: React.FC = () => {
   const { students, classes, attitudes, saveAttitude } = useSchool();
   const { currentUser, activeRole } = useAuth();
 
-  const [selectedClass, setSelectedClass] = useState<string>(classes[0]?.classId || '7A');
+  // Requirement 2: Lock strictly to homeroom class for Wali Kelas
+  const walasClassId = React.useMemo(() => {
+    return currentUser?.classId || classes.find((c) => c.homeroomTeacherId === currentUser?.teacherCode)?.classId || '7A';
+  }, [currentUser, classes]);
+
+  const defaultClass = activeRole === 'wali_kelas' ? walasClassId : (classes[0]?.classId || '7A');
+
+  const [selectedClass, setSelectedClass] = useState<string>(defaultClass);
   const [isModalOpen, setIsModalOpen] = useState(false);
+
+  // Sync selectedClass if activeRole is wali_kelas
+  React.useEffect(() => {
+    if (activeRole === 'wali_kelas' && selectedClass !== walasClassId) {
+      setSelectedClass(walasClassId);
+    }
+  }, [activeRole, walasClassId, selectedClass]);
 
   const classStudents = students.filter((s) => s.classId === selectedClass);
   const classAttitudes = attitudes.filter((a) => a.classId === selectedClass);
@@ -95,18 +109,28 @@ export const AttitudeView: React.FC = () => {
       {/* Class Selector Bar */}
       <div className="bg-white border border-slate-200 rounded-xl p-3 flex items-center justify-between gap-3">
         <div className="flex items-center gap-2">
-          <span className="text-xs font-semibold text-slate-600">Rombel / Kelas:</span>
-          <select
-            value={selectedClass}
-            onChange={(e) => setSelectedClass(e.target.value)}
-            className="bg-slate-50 border border-slate-200 rounded px-3 py-1.5 text-xs font-bold text-blue-700 focus:outline-none focus:ring-1 focus:ring-blue-600"
-          >
-            {classes.map((c) => (
-              <option key={c.classId} value={c.classId}>
-                {c.classId} ({c.studentCount} Siswa)
-              </option>
-            ))}
-          </select>
+          {activeRole === 'wali_kelas' ? (
+            <div className="bg-blue-50 border border-blue-200 px-3 py-1.5 rounded-lg text-xs font-semibold text-blue-900 flex items-center gap-2">
+              <span className="text-[11px] uppercase tracking-wider text-blue-600 font-bold">Kelas Binaan Anda:</span>
+              <span className="bg-blue-600 text-white font-mono font-bold px-2 py-0.5 rounded text-xs">{walasClassId}</span>
+              <span className="text-slate-500 font-normal">({classStudents.length} Siswa)</span>
+            </div>
+          ) : (
+            <>
+              <span className="text-xs font-semibold text-slate-600">Rombel / Kelas:</span>
+              <select
+                value={selectedClass}
+                onChange={(e) => setSelectedClass(e.target.value)}
+                className="bg-slate-50 border border-slate-200 rounded px-3 py-1.5 text-xs font-bold text-blue-700 focus:outline-none focus:ring-1 focus:ring-blue-600"
+              >
+                {classes.map((c) => (
+                  <option key={c.classId} value={c.classId}>
+                    {c.classId} ({c.studentCount} Siswa)
+                  </option>
+                ))}
+              </select>
+            </>
+          )}
         </div>
 
         <span className="text-xs text-slate-500 font-mono">

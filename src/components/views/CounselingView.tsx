@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import {
   ShieldAlert,
   HeartHandshake,
@@ -17,16 +17,48 @@ import { useAuth } from '../../context/AuthContext';
 import { CounselingRecord, CounselingStatus } from '../../types';
 
 export const CounselingView: React.FC = () => {
-  const { priorityBkStudents, counselingRecords, addCounselingRecord, updateCounselingRecord } = useSchool();
+  const {
+    priorityBkStudents,
+    counselingRecords,
+    addCounselingRecord,
+    updateCounselingRecord,
+    getBKAssignedStudents,
+    getBKAssignedClasses,
+    teachers,
+  } = useSchool();
   const { currentUser, activeRole } = useAuth();
 
+  const currentCounselor = useMemo(() => {
+    return teachers.find(
+      (t) =>
+        t.name.toLowerCase() === currentUser?.name.toLowerCase() ||
+        t.username === currentUser?.username ||
+        t.id === currentUser?.id ||
+        ((t.role === 'guru_bk' || t.isBK) && (t.teacherCode === currentUser?.teacherCode || t.code === currentUser?.teacherCode))
+    );
+  }, [teachers, currentUser]);
+
+  const identifier = currentCounselor?.id || currentUser?.name || '';
+  const myAssignedStudents = useMemo(() => getBKAssignedStudents(identifier), [getBKAssignedStudents, identifier]);
+  const myAssignedClasses = useMemo(() => getBKAssignedClasses(identifier), [getBKAssignedClasses, identifier]);
+  const myStudentIds = useMemo(() => new Set(myAssignedStudents.map((s) => s.id)), [myAssignedStudents]);
+
+  const [filterMode, setFilterMode] = useState<'binaan' | 'all'>('binaan');
+
+  const visiblePriorityStudents = useMemo(() => {
+    if (activeRole === 'guru_bk' && filterMode === 'binaan' && myAssignedStudents.length > 0) {
+      return priorityBkStudents.filter((p) => myStudentIds.has(p.student.id));
+    }
+    return priorityBkStudents;
+  }, [activeRole, filterMode, priorityBkStudents, myAssignedStudents, myStudentIds]);
+
   const [selectedStudentId, setSelectedStudentId] = useState<string>(
-    priorityBkStudents[0]?.student.id || ''
+    visiblePriorityStudents[0]?.student.id || priorityBkStudents[0]?.student.id || ''
   );
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingRecord, setEditingRecord] = useState<CounselingRecord | null>(null);
 
-  const selectedPriority = priorityBkStudents.find((p) => p.student.id === selectedStudentId);
+  const selectedPriority = visiblePriorityStudents.find((p: any) => p.student.id === selectedStudentId) || priorityBkStudents.find((p: any) => p.student.id === selectedStudentId);
 
   const [formData, setFormData] = useState({
     date: '2026-10-31',
@@ -195,19 +227,48 @@ export const CounselingView: React.FC = () => {
                 Daftar Siswa Prioritas (&gt;30 Poin)
               </span>
               <span className="text-[10px] text-slate-400 font-mono">
-                Urut Poin Tertinggi
+                {visiblePriorityStudents.length} Siswa
               </span>
             </div>
 
+            {activeRole === 'guru_bk' && myAssignedStudents.length > 0 && (
+              <div className="flex rounded-lg bg-slate-100 p-0.5 mb-2.5 text-[11px] font-semibold">
+                <button
+                  type="button"
+                  onClick={() => setFilterMode('binaan')}
+                  className={`flex-1 py-1 rounded-md transition-all text-center ${
+                    filterMode === 'binaan'
+                      ? 'bg-white text-rose-700 shadow-xs'
+                      : 'text-slate-600 hover:text-slate-900'
+                  }`}
+                >
+                  Binaan Saya ({myAssignedClasses.join(', ') || 'Rombel'})
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setFilterMode('all')}
+                  className={`flex-1 py-1 rounded-md transition-all text-center ${
+                    filterMode === 'all'
+                      ? 'bg-white text-slate-800 shadow-xs'
+                      : 'text-slate-600 hover:text-slate-900'
+                  }`}
+                >
+                  Semua Kelas
+                </button>
+              </div>
+            )}
+
             <div className="space-y-2">
-              {priorityBkStudents.length === 0 ? (
+              {visiblePriorityStudents.length === 0 ? (
                 <p className="text-center py-6 text-xs text-slate-400">
-                  Tidak ada siswa dalam daftar prioritas saat ini.
+                  {filterMode === 'binaan'
+                    ? 'Tidak ada siswa binaan dalam daftar prioritas (>30 poin).'
+                    : 'Tidak ada siswa dalam daftar prioritas saat ini.'}
                 </p>
               ) : (
-                priorityBkStudents.map((item) => {
+                visiblePriorityStudents.map((item: any) => {
                   const isSelected = item.student.id === selectedStudentId;
-                  const cStatus = item.latestCounseling?.status || 'Belum Ditangani';
+                  const cStatus = (item.latestCounseling?.status || 'Belum Ditangani') as CounselingStatus;
 
                   return (
                     <div
@@ -235,7 +296,7 @@ export const CounselingView: React.FC = () => {
 
                       <div className="mt-2 pt-2 border-t border-slate-100 flex items-center justify-between text-[10px]">
                         <span className="text-slate-400">Status Pembinaan:</span>
-                        <span className={`px-2 py-0.5 rounded border font-semibold ${statusColors[cStatus]}`}>
+                        <span className={`px-2 py-0.5 rounded border font-semibold ${statusColors[cStatus] || 'text-slate-600'}`}>
                           {cStatus}
                         </span>
                       </div>
@@ -292,7 +353,7 @@ export const CounselingView: React.FC = () => {
                 </h4>
 
                 <div className="space-y-2.5">
-                  {selectedPriority.violations.map((v, vIdx) => (
+                  {selectedPriority.violations.map((v: any, vIdx: number) => (
                     <div
                       key={v.id}
                       className="p-3 bg-slate-50 rounded-lg border border-slate-200/80 flex items-start justify-between gap-3 text-xs"

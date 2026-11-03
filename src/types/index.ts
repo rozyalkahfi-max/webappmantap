@@ -8,6 +8,7 @@ export interface UserAccount {
   role: UserRole; // primary role
   availableRoles: UserRole[]; // for multi-role guru (e.g. ['guru_mapel', 'wali_kelas'])
   classId?: string; // assigned homeroom if wali_kelas
+  bkClasses?: string[]; // assigned classes for Guru BK (e.g. ['7A', '7B', '7C'])
   teacherCode?: string; // kode guru mapel (e.g. G01)
   subject?: string; // mata pelajaran utama
   avatar?: string;
@@ -31,12 +32,33 @@ export interface Teacher {
   name: string;
   nip?: string;
   role: UserRole;
+  isBK?: boolean;
+  code?: string;
   classId?: string; // assigned homeroom if wali kelas
+  bkClasses?: string[]; // assigned classes for Guru BK (e.g. ['7A', '7B', '7C'])
   teacherCode: string; // Kode Guru Mapel, e.g. "G01", "G02"
   subject: string; // Mata pelajaran yang diampu
   status: 'Aktif' | 'Cuti' | 'Nonaktif';
   phone?: string;
   email?: string;
+}
+
+export interface BKAssignment {
+  id: string;
+  counselorId: string; // teacherCode or username e.g. "G15" or "guru.bambangbk"
+  counselorName: string; // e.g. "Drs. Bambang Irawan, M.Pd"
+  classId: string; // e.g. "7A"
+  studentId?: string; // optional ID siswa
+  studentName?: string; // nama siswa
+  nis?: string;
+  assignedAt?: string;
+}
+
+export interface BKImportRow {
+  studentName?: string;
+  classId: string;
+  counselorName: string;
+  counselorId?: string;
 }
 
 export interface ClassRoom {
@@ -45,6 +67,7 @@ export interface ClassRoom {
   gradeLevel: '7' | '8' | '9';
   homeroomTeacherId?: string; // teacherCode or username of wali kelas
   homeroomTeacherName?: string;
+  homeroomTeacher?: string;
   studentCount: number;
   academicYear: string;
   status: 'Aktif' | 'Nonaktif';

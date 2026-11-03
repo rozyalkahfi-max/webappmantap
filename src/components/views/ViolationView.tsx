@@ -9,6 +9,7 @@ export const ViolationView: React.FC = () => {
   const {
     students,
     classes,
+    schedules,
     violations,
     violationRules,
     addViolation,
@@ -16,8 +17,34 @@ export const ViolationView: React.FC = () => {
     deleteViolation,
     getStudentPoints,
     getStudentViolationCategory,
+    getBKAssignedStudents,
+    getBKAssignedClasses,
+    teachers,
   } = useSchool();
   const { currentUser, activeRole } = useAuth();
+
+  // Scope class for Wali Kelas
+  const walasClassId = useMemo(() => {
+    return currentUser?.classId || classes.find((c) => c.homeroomTeacherId === currentUser?.teacherCode)?.classId || '';
+  }, [currentUser, classes]);
+
+  // Scope students & classes for Guru BK
+  const currentCounselor = useMemo(() => {
+    return teachers.find(
+      (t) =>
+        t.name.toLowerCase() === currentUser?.name.toLowerCase() ||
+        t.username === currentUser?.username ||
+        t.id === currentUser?.id ||
+        (t.isBK && t.code === currentUser?.teacherCode)
+    );
+  }, [teachers, currentUser]);
+
+  const bkIdentifier = currentCounselor?.id || currentUser?.name || '';
+  const myAssignedStudents = useMemo(() => getBKAssignedStudents(bkIdentifier), [getBKAssignedStudents, bkIdentifier]);
+  const myAssignedClasses = useMemo(() => getBKAssignedClasses(bkIdentifier), [getBKAssignedClasses, bkIdentifier]);
+  const myBkStudentIds = useMemo(() => new Set(myAssignedStudents.map((s) => s.id)), [myAssignedStudents]);
+  const myBkClassesSet = useMemo(() => new Set(myAssignedClasses), [myAssignedClasses]);
+  const [bkFilterScope, setBkFilterScope] = useState<'binaan' | 'all'>('binaan');
 
   const [selectedClass, setSelectedClass] = useState<string>('ALL');
   const [selectedCategoryFilter, setSelectedCategoryFilter] = useState<string>('ALL');
@@ -28,16 +55,34 @@ export const ViolationView: React.FC = () => {
   const [walasGuidanceNotes, setWalasGuidanceNotes] = useState('');
 
   // RBAC Permission check per requirement 3:
-  // "yang berhak melihat masukan tiap point yang diberikan guru mapel, dan wali kelas, hanya wali kelas dan guru BK yang bisa melihat"
-  // - Guru BK: see all records
-  // - Wali Kelas: see records for their class
-  // - Admin: see all
-  // - Guru Mapel: see reports they created
-  // - Kepala Sekolah: see severe cases (> 30 points) only
   const isBkOrAdmin = activeRole === 'guru_bk' || activeRole === 'admin_operator';
   const isWaliKelas = activeRole === 'wali_kelas';
   const isGuruMapel = activeRole === 'guru_mapel';
   const isKepsek = activeRole === 'kepala_sekolah';
+
+  // Classes taught by Guru Mapel
+  const taughtClassIds = useMemo(() => {
+    if (!isGuruMapel) return [];
+    const code = currentUser?.teacherCode;
+    const name = currentUser?.name?.toLowerCase();
+    const mySchedules = schedules.filter(
+      (s) => (code && s.teacherCode === code) || (name && s.teacherName.toLowerCase() === name)
+    );
+    return Array.from(new Set(mySchedules.map((s) => s.classId)));
+  }, [schedules, isGuruMapel, currentUser]);
+
+  // Requirement 2 & 3: Students eligible for this user to report
+  const eligibleStudents = useMemo(() => {
+    if (isWaliKelas) {
+      return students.filter((s) => s.classId === walasClassId);
+    }
+    if (isGuruMapel) {
+      if (taughtClassIds.length > 0) {
+        return students.filter((s) => taughtClassIds.includes(s.classId));
+      }
+    }
+    return students;
+  }, [students, isWaliKelas, isGuruMapel, walasClassId, taughtClassIds]);
 
   // Modal form state
   const defaultRule = violationRules[0] || {
@@ -63,7 +108,7 @@ export const ViolationView: React.FC = () => {
   });
 
   const handleOpenAdd = () => {
-    const firstStudent = students[0];
+    const firstStudent = eligibleStudents[0];
     const rule = violationRules.find((r) => r.code === selectedRuleCode) || defaultRule;
 
     setFormData({
@@ -144,7 +189,8 @@ export const ViolationView: React.FC = () => {
       // 1. Role Scoping
       if (isWaliKelas) {
         // Walas only sees students of their assigned class
-        if (currentUser?.classId && v.classId !== currentUser.classId) return false;
+        const targetClass = walasClassId || currentUser?.classId;
+        if (targetClass && v.classId !== targetClass) return false;
       } else if (isGuruMapel) {
         // Guru mapel sees their reported violations
         const code = currentUser?.teacherCode;
@@ -156,6 +202,13 @@ export const ViolationView: React.FC = () => {
         // Kepsek only sees severe violations (> 30 total student points) per requirement 3
         const total = getStudentPoints(v.studentId);
         if (total <= 30) return false;
+      } else if (activeRole === 'guru_bk') {
+        // Guru BK sees their binaan students by default
+        if (bkFilterScope === 'binaan' && myBkStudentIds.size > 0) {
+          const matchStudent = myBkStudentIds.has(v.studentId);
+          const matchClass = myBkClassesSet.has(v.classId);
+          if (!matchStudent && !matchClass) return false;
+        }
       }
 
       // 2. Class filter
@@ -166,7 +219,7 @@ export const ViolationView: React.FC = () => {
 
       return true;
     });
-  }, [violations, isWaliKelas, isGuruMapel, isKepsek, currentUser, selectedClass, selectedCategoryFilter, getStudentPoints]);
+  }, [violations, isWaliKelas, isGuruMapel, isKepsek, activeRole, bkFilterScope, myBkStudentIds, myBkClassesSet, currentUser, selectedClass, selectedCategoryFilter, getStudentPoints]);
 
   const columns: ColumnDef<ViolationRecord>[] = [
     {
@@ -333,11 +386,19 @@ export const ViolationView: React.FC = () => {
       const total = getStudentPoints(v.studentId);
       if (total >= 30 && !studentMap.has(v.studentId)) {
         const st = students.find((s) => s.id === v.studentId);
-        if (st) studentMap.set(v.studentId, { student: st, points: total });
+        if (st) {
+          if (activeRole === 'guru_bk' && myBkStudentIds.size > 0) {
+            if (myBkStudentIds.has(st.id) || myBkClassesSet.has(st.classId)) {
+              studentMap.set(v.studentId, { student: st, points: total });
+            }
+          } else {
+            studentMap.set(v.studentId, { student: st, points: total });
+          }
+        }
       }
     });
     return Array.from(studentMap.values());
-  }, [violations, students, getStudentPoints]);
+  }, [violations, students, getStudentPoints, activeRole, myBkStudentIds, myBkClassesSet]);
 
   return (
     <div className="space-y-4">
@@ -454,6 +515,32 @@ export const ViolationView: React.FC = () => {
             </div>
           )}
 
+          {activeRole === 'guru_bk' && myAssignedClasses.length > 0 && (
+            <div>
+              <label className="block text-[11px] font-semibold text-slate-500 mb-1">Cakupan Siswa BK</label>
+              <div className="inline-flex rounded-lg bg-slate-100 p-0.5 border border-slate-200">
+                <button
+                  type="button"
+                  onClick={() => setBkFilterScope('binaan')}
+                  className={`px-2.5 py-1 text-xs font-semibold rounded-md transition-all ${
+                    bkFilterScope === 'binaan' ? 'bg-white text-rose-700 shadow-xs' : 'text-slate-600'
+                  }`}
+                >
+                  Binaan Saya ({myAssignedClasses.join(', ')})
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setBkFilterScope('all')}
+                  className={`px-2.5 py-1 text-xs font-semibold rounded-md transition-all ${
+                    bkFilterScope === 'all' ? 'bg-white text-slate-800 shadow-xs' : 'text-slate-600'
+                  }`}
+                >
+                  Semua Siswa
+                </button>
+              </div>
+            </div>
+          )}
+
           <div>
             <label className="block text-[11px] font-semibold text-slate-500 mb-1">Kategori Pelanggaran</label>
             <select
@@ -516,10 +603,7 @@ export const ViolationView: React.FC = () => {
                     className="w-full px-3 py-1.5 border border-slate-300 rounded-lg bg-white text-slate-900 font-medium"
                   >
                     <option value="">Pilih Siswa...</option>
-                    {(isWaliKelas
-                      ? students.filter((s) => s.classId === currentUser?.classId)
-                      : students
-                    ).map((st) => (
+                    {eligibleStudents.map((st) => (
                       <option key={st.id} value={st.id}>
                         {st.name} ({st.nis} - Kelas {st.classId})
                       </option>

@@ -18,7 +18,9 @@ export const WaliClassReportsView: React.FC = () => {
   const { students, classes, grades, attendanceSessions, settings } = useSchool();
   const { currentUser } = useAuth();
 
-  const myClassId = currentUser?.classId || '7A';
+  const myClassId = useMemo(() => {
+    return currentUser?.classId || classes.find((c) => c.homeroomTeacherId === currentUser?.teacherCode)?.classId || '7A';
+  }, [currentUser, classes]);
   const myClassRoom = classes.find((c) => c.classId === myClassId);
   const classStudents = useMemo(() => {
     return students.filter((s) => s.classId === myClassId);

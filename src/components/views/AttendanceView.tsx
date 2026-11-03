@@ -15,6 +15,11 @@ import { useSchool } from '../../context/SchoolContext';
 import { useAuth } from '../../context/AuthContext';
 import { AttendanceStatus } from '../../types';
 import { exportToExcel } from '../../utils/excel';
+import {
+  consolidateScheduleItems,
+  findAttendanceForConsolidated,
+  ConsolidatedScheduleItem,
+} from '../../utils/scheduleConsolidator';
 
 export const AttendanceView: React.FC = () => {
   const { schedules, students, classes, attendanceSessions, saveAttendanceSession, addViolation } = useSchool();
@@ -23,28 +28,31 @@ export const AttendanceView: React.FC = () => {
   const today = new Date().toISOString().split('T')[0];
   const [selectedDate, setSelectedDate] = useState<string>(today);
 
-  // Filter schedules available for dropdown
-  const availableSchedules = schedules.filter((s) => {
-    if (activeRole === 'guru_mapel') {
-      const code = currentUser?.teacherCode;
-      const name = currentUser?.name?.toLowerCase();
-      if (code && s.teacherCode === code) return true;
-      if (name && s.teacherName.toLowerCase() === name) return true;
-      return false;
-    }
-    return true;
-  });
+  // Requirement 1 & 3: Consolidate contiguous teaching periods for teacher
+  const availableConsolidatedSchedules: ConsolidatedScheduleItem[] = React.useMemo(() => {
+    const raw = schedules.filter((s) => {
+      if (activeRole === 'guru_mapel') {
+        const code = currentUser?.teacherCode;
+        const name = currentUser?.name?.toLowerCase();
+        if (code && s.teacherCode === code) return true;
+        if (name && s.teacherName.toLowerCase() === name) return true;
+        return false;
+      }
+      return true;
+    });
+    return consolidateScheduleItems(raw);
+  }, [schedules, activeRole, currentUser]);
 
   const [selectedScheduleId, setSelectedScheduleId] = useState<string>(() => {
-    return availableSchedules[0]?.id || schedules[0]?.id || '';
+    return availableConsolidatedSchedules[0]?.id || '';
   });
 
-  // Ensure selectedScheduleId is valid whenever availableSchedules change
+  // Ensure selectedScheduleId is valid whenever availableConsolidatedSchedules change
   React.useEffect(() => {
-    if (availableSchedules.length > 0 && !availableSchedules.some((s) => s.id === selectedScheduleId)) {
-      setSelectedScheduleId(availableSchedules[0].id);
+    if (availableConsolidatedSchedules.length > 0 && !availableConsolidatedSchedules.some((s) => s.id === selectedScheduleId)) {
+      setSelectedScheduleId(availableConsolidatedSchedules[0].id);
     }
-  }, [availableSchedules, selectedScheduleId]);
+  }, [availableConsolidatedSchedules, selectedScheduleId]);
 
   const [activeTab, setActiveTab] = useState<'input' | 'recap'>('input');
   const [topic, setTopic] = useState('Pendalaman Materi dan Diskusi Kelompok');
@@ -52,16 +60,16 @@ export const AttendanceView: React.FC = () => {
   const [saveSuccess, setSaveSuccess] = useState(false);
   const [truantAlerts, setTruantAlerts] = useState<string[]>([]);
 
-  // Relevant schedule
-  const currentSchedule = schedules.find((s) => s.id === selectedScheduleId);
+  // Relevant consolidated schedule
+  const currentSchedule = availableConsolidatedSchedules.find((s) => s.id === selectedScheduleId);
   const classStudents = currentSchedule
     ? students.filter((s) => s.classId === currentSchedule.classId)
     : [];
 
-  // Existing session for this schedule & date
-  const existingSession = attendanceSessions.find(
-    (s) => s.scheduleId === selectedScheduleId && s.date === selectedDate
-  );
+  // Existing session for this consolidated schedule & date (presensi 1 kali saja)
+  const existingSession = currentSchedule
+    ? findAttendanceForConsolidated(attendanceSessions, currentSchedule, selectedDate)
+    : undefined;
 
   // Attendance state for students
   const [records, setRecords] = useState<Record<string, AttendanceStatus>>({});
@@ -170,8 +178,27 @@ export const AttendanceView: React.FC = () => {
   const alpaCount = Object.values(records).filter((s) => s === 'Alpa').length;
   const attendanceRate = totalCount > 0 ? Math.round((hadirCount / totalCount) * 100) : 0;
 
+  // Filter sessions for recap based on role (Requirement 3: Guru only sees their classes/records)
+  const teacherClassIds = React.useMemo(() => {
+    return Array.from(new Set(availableConsolidatedSchedules.map((s) => s.classId)));
+  }, [availableConsolidatedSchedules]);
+
+  const filteredSessions = React.useMemo(() => {
+    if (activeRole === 'guru_mapel') {
+      const code = currentUser?.teacherCode;
+      const name = currentUser?.name?.toLowerCase();
+      return attendanceSessions.filter(
+        (ses) =>
+          (code && ses.teacherCode === code) ||
+          (name && ses.teacherName?.toLowerCase() === name) ||
+          teacherClassIds.includes(ses.classId)
+      );
+    }
+    return attendanceSessions;
+  }, [attendanceSessions, activeRole, currentUser, teacherClassIds]);
+
   const handleExportRecap = () => {
-    const recapRows = attendanceSessions.map((ses) => {
+    const recapRows = filteredSessions.map((ses) => {
       const recs = Object.values(ses.records);
       const h = recs.filter((s) => s === 'Hadir').length;
       const s = recs.filter((st) => st === 'Sakit').length;
@@ -262,9 +289,9 @@ export const AttendanceView: React.FC = () => {
                   onChange={(e) => setSelectedScheduleId(e.target.value)}
                   className="w-full px-3 py-1.5 text-xs border border-slate-300 rounded-lg focus:outline-none focus:ring-1 focus:ring-blue-600 bg-white font-medium text-slate-900"
                 >
-                  {availableSchedules.map((s) => (
+                  {availableConsolidatedSchedules.map((s) => (
                     <option key={s.id} value={s.id}>
-                      [{s.day}] Kelas {s.classId} · {s.subjectName} · {s.teacherName} (Jam {s.period})
+                      [{s.day}] Kelas {s.classId} · {s.subjectName} · {s.teacherName} ({s.periodDisplay} - {s.timeDisplay})
                     </option>
                   ))}
                 </select>
@@ -280,6 +307,10 @@ export const AttendanceView: React.FC = () => {
                   <span>·</span>
                   <span>
                     Mapel: <strong className="text-slate-900">{currentSchedule.subjectName}</strong>
+                  </span>
+                  <span>·</span>
+                  <span>
+                    Waktu: <strong className="text-emerald-700 font-semibold">{currentSchedule.periodDisplay} ({currentSchedule.timeDisplay} WIB)</strong>
                   </span>
                   <span>·</span>
                   <span>
@@ -518,7 +549,7 @@ export const AttendanceView: React.FC = () => {
         <div className="space-y-4">
           <div className="flex items-center justify-between">
             <span className="text-xs font-semibold text-slate-600">
-              Riwayat Pembelajaran & Rekap Sesi Presensi ({attendanceSessions.length} Sesi Terbaca)
+              Riwayat Pembelajaran & Rekap Sesi Presensi ({filteredSessions.length} Sesi Terbaca)
             </span>
             <button
               onClick={handleExportRecap}
@@ -546,7 +577,7 @@ export const AttendanceView: React.FC = () => {
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
-                {attendanceSessions.map((ses) => {
+                {filteredSessions.map((ses) => {
                   const recs = Object.values(ses.records);
                   const h = recs.filter((s) => s === 'Hadir').length;
                   const s = recs.filter((st) => st === 'Sakit').length;
